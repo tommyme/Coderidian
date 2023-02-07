@@ -6,3 +6,8 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+.cm-inline-code {
+  border-bottom: 1px black solid;
+  background-color: #ddf !important;
+  font-weight: bold;
+}
