@@ -10,4 +10,21 @@ If your plugin does not need CSS, delete this file.
   border-bottom: 1px black solid;
   background-color: #ddf !important;
   font-weight: bold;
+  display: inline-block;
+  padding: 0 0.5rem
+}
+.cm-formatting.cm-formatting-code {
+  padding: 0;
+}
+
+.HyperMD-codeblock {
+  background-color: #eff6e9 !important;
+}
+
+body {
+  --list-indent: 4
+}
+
+.HyperMD-quote {
+  color: cadetblue;
 }
