@@ -1,5 +1,7 @@
 import { App, Editor, MarkdownView, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
-
+import {readFileSync} from 'fs'
+import {homedir} from 'os'
+import {basename} from 'path'
 // Remember to rename these classes and interfaces!
 
 interface MyPluginSettings {
@@ -15,13 +17,32 @@ export default class MyPlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
+		const data = readFileSync(`${homedir}/Library/Application Support/obsidian/obsidian.json`);
+		const parsed = JSON.parse(data.toString())
+		Object.entries(parsed.vaults).forEach(([key, value], idx) => {
+			console.log(key, value)
+			let vault_dirname = basename(value.path)
+
+			this.addCommand({
+				id: `jump2vault :: ${vault_dirname}`,
+				name: `jump2vault :: ${vault_dirname}`,
+				callback: () => {
+					window.open(`obsidian://open?vault=${key}`)
+					this.app.commands.executeCommandById("workspace:close-window")
+				}
+			})
+		})
+
 
 		// This creates an icon in the left ribbon.
 		const ribbonIconEl = this.addRibbonIcon('dice', 'quick switcher', (evt: MouseEvent) => {
 			// Called when the user clicks the icon.
-			// const view = this.app.workspace.getActiveViewOfType(MarkdownView)
+			const view = this.app.workspace.getActiveViewOfType(MarkdownView)
+			// const editor = view.editor;
+			window.view = view
+			window.view.editor.focus();
 			const cmd = this.app.commands.commands['switcher:open'].callback
-			cmd()
+			// cmd()
 		});
 		// Perform additional things with the ribbon
 		ribbonIconEl.addClass('my-plugin-ribbon-class');
