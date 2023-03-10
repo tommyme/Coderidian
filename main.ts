@@ -72,6 +72,27 @@ export default class MyPlugin extends Plugin {
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new SampleSettingTab(this.app, this));
+
+		// 添加一种代码块
+		this.registerMarkdownCodeBlockProcessor(`htmlx`, (source, el, ctx) => {
+			// window.__el = el;
+			// window.__source = source;
+			// window.__ctx = ctx;
+			// window.__this = this;
+			
+			const div = document.createElement("div");
+			div.innerHTML = source;
+			el.appendChild(div)
+		});
+		this.registerMarkdownCodeBlockProcessor(`hidden-js`, (source, el, ctx) => {
+			
+			const xxscript = document.createElement("script");
+			xxscript.textContent = source
+			el.appendChild(xxscript)
+			const prompt = document.createElement("div");
+			prompt.textContent = 'here is some hidden javascript code'
+			el.appendChild(prompt);
+		});
 	}
 
 	onunload() {
