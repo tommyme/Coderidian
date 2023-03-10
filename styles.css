@@ -28,3 +28,33 @@ body {
 .HyperMD-quote {
   color: cadetblue;
 }
+
+.HyperMD-header.cm-line::after {
+  border: 1px solid rgb(200, 192, 192);
+  border-radius: 3px;
+  color: rgb(200, 192, 192);
+  font-size: 16px;
+  margin: auto 5px;
+  position: absolute;
+  line-height: 1;
+  padding: 0px 2px;
+}
+
+.HyperMD-header-1::after {
+  content: "h1";
+}
+.HyperMD-header-2::after {
+  content: "h2";
+}
+.HyperMD-header-3::after {
+  content: "h3";
+}
+.HyperMD-header-4::after {
+  content: "h4";
+}
+.HyperMD-header-5::after {
+  content: "h5";
+}
+.HyperMD-header-6::after {
+  content: "h6";
+}
