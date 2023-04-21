@@ -93,6 +93,24 @@ export default class MyPlugin extends Plugin {
 			prompt.textContent = 'here is some hidden javascript code'
 			el.appendChild(prompt);
 		});
+		this.registerMarkdownCodeBlockProcessor(`buttonjs`, (source, el, ctx) => {
+			function processText(source: string) {
+				const lines = source.split('\n');
+				const name = lines[0];
+				const content = lines.slice(1).join('\n');
+				return { name, content };
+			}
+
+			const {name, content} = processText(source)
+			
+			// source line 1 is the label of button
+			const btn = document.createElement("button");
+			btn.addEventListener("click", () => {
+				eval(content);
+			})
+			btn.textContent = name
+			el.appendChild(btn);
+		});
 	}
 
 	onunload() {

@@ -6,25 +6,33 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+
+/* inline code 高亮 */
 .cm-inline-code {
-  border-bottom: 1px black solid;
+  border: 1px #999 solid;
+  border-radius: 10px;
   background-color: #ddf !important;
   font-weight: bold;
   display: inline-block;
   padding: 0 0.5rem
 }
-.cm-formatting.cm-formatting-code {
+
+/* 修复代码块莫名其妙的padding */
+/* .cm-formatting.cm-formatting-code {
   padding: 0;
-}
+} */
 
-.HyperMD-codeblock {
+/* 代码块背景色 */
+/* .HyperMD-codeblock {
   background-color: #eff6e9 !important;
-}
+} */
 
-body {
+/* 代码缩进设置为 4 */
+/* body {
   --list-indent: 4
-}
+} */
 
+/* quote文字显示为绿色 */
 .HyperMD-quote {
   color: cadetblue;
 }
@@ -60,7 +68,7 @@ body {
   content: "h6";
 }
 
-/* 让outline的按钮不要造成标题的缩进 */
+/* 让outline view的展开按钮不要造成标题的缩进 */
 .tree-item-self.mod-collapsible.is-clickable {
   flex-direction: row-reverse;
 }
