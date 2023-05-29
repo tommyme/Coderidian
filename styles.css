@@ -69,6 +69,6 @@ If your plugin does not need CSS, delete this file.
 }
 
 /* 让outline view的展开按钮不要造成标题的缩进 */
-.tree-item-self.mod-collapsible.is-clickable {
-  flex-direction: row-reverse;
-}
+/* .tree-item-self.mod-collapsible.is-clickable { */
+/*   flex-direction: row-reverse; */
+/* } */
