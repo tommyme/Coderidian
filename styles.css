@@ -67,7 +67,9 @@ If your plugin does not need CSS, delete this file.
 .HyperMD-header-6::after {
   content: "h6";
 }
-
+.callout[data-callout="ai"] > .callout-title {
+  margin-left: 0;
+}
 /* 让outline view的展开按钮不要造成标题的缩进 */
 /* .tree-item-self.mod-collapsible.is-clickable { */
 /*   flex-direction: row-reverse; */
