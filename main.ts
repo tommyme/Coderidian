@@ -76,6 +76,16 @@ export default class MyPlugin extends Plugin {
 				wrap_content(editor, '<a href="">', '</a>');
 			},
 		})
+		for (let i=1;i<4;i++) {
+			let tag_name = `h${String(i)}`;
+			this.addCommand({
+				id: `wrap-html-${tag_name}`,
+				name: `wrap html ${tag_name}`,
+				editorCallback(editor, ctx) {
+					wrap_content(editor, `<${tag_name}>`, `</${tag_name}>`);
+				},
+			})
+		}
 		this.addCommand({
 			id: 'zip-the-vault',
 			name: 'zip the vault',
