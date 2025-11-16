@@ -19,6 +19,7 @@ const execPromise = promisify(exec);
 
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
+	private isBoldMode = true;
 
 	async onload() {
 		await this.loadSettings();
@@ -55,6 +56,10 @@ export default class MyPlugin extends Plugin {
 			const cmd = this.app.commands['switcher:open'].callback
 		});
 		ribbonIconEl.addClass('my-plugin-ribbon-class');
+
+		this.addRibbonIcon('switch', 'bind switched (bold/left sidebar)', () => {
+            this.toggleSidebarOrBoldMode();
+        });
 		//#endregion
 
 		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
@@ -62,6 +67,28 @@ export default class MyPlugin extends Plugin {
 		// statusBarItemEl.setText('Status Bar Text');
 
 		//#region add commands
+        this.addCommand({
+            id: 'toggle-bold-or-sidebar',
+            name: 'Toggle Bold or Sidebar (depending on config)',
+            hotkeys: [
+                {
+                    modifiers: ["Ctrl"],
+                    key: "b"
+                }
+            ],
+            callback: () => {
+                if (this.isBoldMode) {
+                    this.app.commands.executeCommandById('editor:toggle-bold');
+                } else {
+                    this.app.commands.executeCommandById('app:toggle-left-sidebar');
+                }
+            }
+        });
+        this.addCommand({
+            id: 'toggle-bold-or-sidebar-switch',
+            name: 'Toggle Bold or Sidebar (do switch)',
+            callback: () => this.toggleSidebarOrBoldMode()
+        });
 		this.addCommand({
 			id: 'wrap-html-gray',
 			name: 'wrap html gray',
@@ -76,6 +103,7 @@ export default class MyPlugin extends Plugin {
 				wrap_content(editor, '<a href="">', '</a>');
 			},
 		})
+		// h1~h4 title style
 		for (let i=1;i<4;i++) {
 			let tag_name = `h${String(i)}`;
 			this.addCommand({
@@ -100,8 +128,17 @@ export default class MyPlugin extends Plugin {
 				}
 			},
 		})
+		this.addCommand({
+			id: 'copy-selected-lf-content',
+			name: 'copy selected lf content',
+			async editorCallback(editor, ctx) {
+				let selectedText = editor.getSelection();
+				selectedText = selectedText.replace(/\n/g, '\r\n');
+				await navigator.clipboard.writeText(selectedText);
+			},
+		})
 		//#endregion
-
+		
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new SampleSettingTab(this.app, this));
 
@@ -148,6 +185,18 @@ export default class MyPlugin extends Plugin {
 	onunload() {
 
 	}
+
+	updateNotice() {
+        const mode = this.isBoldMode ? '加粗 (Bold)' : '侧边栏 (Sidebar)';
+        new Notice(`快捷键模式已切换至: ${mode}`);
+    }
+
+	toggleSidebarOrBoldMode() {
+        // 翻转状态
+        this.isBoldMode = !this.isBoldMode;
+        // 显示提示，告知用户当前模式
+        this.updateNotice();
+    }
 
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
