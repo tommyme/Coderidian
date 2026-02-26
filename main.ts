@@ -1,4 +1,4 @@
-import { App, Editor, MarkdownView, Notice, Plugin, PluginSettingTab, Setting, Platform, Modal } from 'obsidian';
+import { App, Editor, MarkdownView, Notice, Plugin, PluginSettingTab, Setting, Platform, Modal, addIcon } from 'obsidian';
 import { readFileSync, existsSync } from 'fs'
 import { homedir } from 'os'
 import { basename } from 'path'
@@ -9,10 +9,24 @@ import { promisify } from 'util';
 
 interface MyPluginSettings {
 	mySetting: string;
+	// Open VSCode settings
+	ribbonIcon: boolean;
+	ribbonMethodCode: boolean;
+	codeCommandTemplate: string;
+	urlOpenFile: boolean;
+	urlWorkspacePath: string;
+	urlProtocol: string;
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+	mySetting: 'default',
+	// Open VSCode default settings
+	ribbonIcon: true,
+	ribbonMethodCode: true,
+	codeCommandTemplate: 'code "{{vaultpath}}" "{{vaultpath}}/{{filepath}}"',
+	urlOpenFile: false,
+	urlWorkspacePath: "{{vaultpath}}",
+	urlProtocol: "vscode://"
 }
 
 const execPromise = promisify(exec);
@@ -46,6 +60,61 @@ export default class MyPlugin extends Plugin {
 				})
 			})
 		}
+
+		// Open VSCode functionality - custom VSCode icon
+		const vscodeIconId = "vscode-logo";
+		const vscodeIconSvgContent = `
+<svg role="img" viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg">
+    <title>Visual Studio Code</title>
+    <path
+        fill="currentColor"
+        d="M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479L1.65 17.94a.999.999 0 0 0 1.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.942-2.377A1.5 1.5 0 0 0 24 20.06V3.939a1.5 1.5 0 0 0-.85-1.352zm-5.146 14.861L10.826 12l7.178-5.448v10.896z"
+    />
+</svg>
+`;
+
+		// Register custom icon - add to DOM
+		const styleEl = document.createElement('style');
+		addIcon(vscodeIconId, vscodeIconSvgContent);
+
+		document.head.appendChild(styleEl);
+		this.register(() => styleEl.remove()); // Cleanup on unload
+
+		if (this.settings.ribbonIcon) {
+			this.addRibbonIcon(vscodeIconId, 'Open in VSCode', () => {
+				this.ribbonHandler();
+			});
+		}
+
+		this.addCommand({
+			id: 'open-vscode',
+			name: 'Open Vault in VSCode',
+			callback: () => {
+				this.openVSCode();
+			}
+		});
+
+		this.addCommand({
+			id: 'open-vscode-via-url',
+			name: 'Open Vault in VSCode (via URL)',
+			callback: () => {
+				this.openVSCodeViaURL();
+			}
+		});
+
+		this.registerEvent(
+			this.app.workspace.on('file-menu', (menu, file) => {
+				menu.addItem((item) => {
+					item
+						.setTitle('Open in VSCode')
+						.setIcon('vscode-logo')
+						.onClick(() => {
+							this.openVSCode(file);
+						});
+				});
+			})
+		);
 
 		//#region ribbonIcons
 		const ribbonIconEl = this.addRibbonIcon('dice', 'quick switcher', (evt: MouseEvent) => {
@@ -186,6 +255,178 @@ export default class MyPlugin extends Plugin {
 
 	}
 
+	// Open VSCode methods
+	ribbonHandler() {
+		if (this.settings.ribbonMethodCode) {
+			this.openVSCode();
+		} else {
+			this.openVSCodeViaURL();
+		}
+	}
+
+	openVSCode(file?: any) {
+		const vaultPath = (this.app.vault.adapter as any).basePath;
+		let filePath = "";
+
+		if (file) {
+			filePath = file.path;
+		} else if (this.app.workspace.getActiveFile()) {
+			filePath = this.app.workspace.getActiveFile().path;
+		}
+
+		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		const line = activeView ? activeView.editor.getCursor().line + 1 : 0;
+		const ch = activeView ? activeView.editor.getCursor().ch + 1 : 0;
+
+		let command = this.interpolateTemplate(this.settings.codeCommandTemplate, {
+			vaultpath: vaultPath,
+			filepath: filePath,
+			folderpath: file?.parent?.path || "",
+			line: line,
+			ch: ch
+		});
+
+		console.log("Executing command:", command);
+
+		// 根据平台设置适当的执行选项
+		const execOptions: any = {};
+		if (Platform.isMacOS) {
+			// macOS 中 VSCode 的 code 命令通常安装在以下位置
+			execOptions.env = {
+				...process.env,
+				PATH: '/usr/local/bin:/Applications/Visual Studio Code.app/Contents/Resources/app/bin:' + (process.env.PATH || '')
+			};
+		} else if (Platform.isWin) {
+			// Windows 系统使用 cmd 作为 shell，确保能找到 code 命令
+			execOptions.shell = 'cmd.exe';
+		}
+
+		try {
+			exec(command, execOptions, (err, stdout, stderr) => {
+				if (err) {
+					console.error("Error executing command:", err);
+					console.error("Stderr:", stderr);
+					// 如果命令失败，尝试备用方案
+					this.tryAlternativeVSCodeMethods(vaultPath, filePath, line, ch, err);
+				} else {
+					console.log("Command executed successfully");
+				}
+			});
+		} catch (error) {
+			console.error("Error executing command:", error);
+			this.tryAlternativeVSCodeMethods(vaultPath, filePath, line, ch, error);
+		}
+	}
+
+	// 尝试备用方法打开 VSCode
+	tryAlternativeVSCodeMethods(vaultPath: string, filePath: string, line: number, ch: number, originalError: any) {
+		console.log("Trying alternative methods to open VSCode");
+
+		if (Platform.isMacOS) {
+			// macOS 备用方法：直接使用 open 命令打开 VSCode
+			let altCommand = `open -a "Visual Studio Code" "${vaultPath}"`;
+			if (filePath) {
+				altCommand = `open -a "Visual Studio Code" "${vaultPath}/${filePath}"`;
+			}
+
+			console.log("Trying macOS open command:", altCommand);
+			exec(altCommand, (err, stdout, stderr) => {
+				if (err) {
+					console.error("Alternative method failed:", err);
+					new Notice("Failed to open VSCode: " + originalError.message);
+				} else {
+					console.log("Alternative macOS method succeeded");
+				}
+			});
+		} else if (Platform.isWin) {
+			// Windows 备用方法：尝试直接调用 code 命令的完整路径
+			const possiblePaths = [
+				'"C:\\Program Files\\Microsoft VS Code\\bin\\code"',
+				'"C:\\Program Files (x86)\\Microsoft VS Code\\bin\\code"'
+			];
+
+			let triedPaths = 0;
+			const tryNextPath = () => {
+				if (triedPaths >= possiblePaths.length) {
+					new Notice("Failed to open VSCode: " + originalError.message);
+					return;
+				}
+
+				const vscodePath = possiblePaths[triedPaths];
+				let altCommand = this.settings.codeCommandTemplate.replace('code ', `${vscodePath} `);
+				altCommand = this.interpolateTemplate(altCommand, {
+					vaultpath: vaultPath,
+					filepath: filePath,
+					folderpath: "",
+					line: line,
+					ch: ch
+				});
+
+				console.log("Trying Windows VSCode path:", altCommand);
+				exec(altCommand, { shell: 'cmd.exe' }, (err, stdout, stderr) => {
+					if (err) {
+						console.error(`Path ${vscodePath} failed:`, err);
+						triedPaths++;
+						tryNextPath();
+					} else {
+						console.log("Alternative Windows method succeeded");
+					}
+				});
+			};
+
+			tryNextPath();
+		} else {
+			// 其他平台（Linux）
+			new Notice("Failed to open VSCode: " + originalError.message);
+		}
+	}
+
+	openVSCodeViaURL(file?: any) {
+		const vaultPath = (this.app.vault.adapter as any).basePath;
+		let filePath = "";
+
+		if (file) {
+			filePath = file.path;
+		} else if (this.settings.urlOpenFile && this.app.workspace.getActiveFile()) {
+			filePath = this.app.workspace.getActiveFile().path;
+		}
+
+		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		const workspacePath = this.interpolateTemplate(this.settings.urlWorkspacePath, {
+			vaultpath: vaultPath,
+			filepath: filePath,
+			folderpath: file?.parent?.path || "",
+			line: activeView ? activeView.editor.getCursor().line + 1 : 0,
+			ch: activeView ? activeView.editor.getCursor().ch + 1 : 0
+		});
+
+		let url = this.settings.urlProtocol + "file/" + encodeURIComponent(workspacePath);
+
+		if (filePath) {
+			url += ":" + encodeURIComponent(filePath);
+			const line = this.app.workspace.getActiveViewOfType(MarkdownView)?.editor.getCursor().line + 1;
+			const ch = this.app.workspace.getActiveViewOfType(MarkdownView)?.editor.getCursor().ch + 1;
+			if (line && ch) {
+				url += ":" + line + ":" + ch;
+			}
+		}
+
+		console.log("Opening URL:", url);
+
+		try {
+			this.app.workspace.openLinkText(url, "", false);
+		} catch (error) {
+			console.error("Error opening URL:", error);
+			new Notice("Failed to open VSCode via URL: " + error);
+		}
+	}
+
+	interpolateTemplate(template: string, variables: any) {
+		return template.replace(/{{(\w+)}}/g, (match, key) => {
+			return variables[key] || "";
+		});
+	}
+
 	updateNotice() {
         const mode = this.isBoldMode ? '加粗 (Bold)' : '侧边栏 (Sidebar)';
         new Notice(`快捷键模式已切换至: ${mode}`);
@@ -260,8 +501,9 @@ class SampleSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		containerEl.createEl('h2', { text: 'Settings for my awesome plugin.' });
+		containerEl.createEl('h2', { text: 'Settings for Coderidian Plugin.' });
 
+		// Original setting
 		new Setting(containerEl)
 			.setName('Setting #1')
 			.setDesc('It\'s a secret')
@@ -273,6 +515,59 @@ class SampleSettingTab extends PluginSettingTab {
 					this.plugin.settings.mySetting = value;
 					await this.plugin.saveSettings();
 				}));
+
+		// Open VSCode settings
+		containerEl.createEl('h2', { text: 'Open in VSCode Settings' });
+
+		new Setting(containerEl)
+			.setName('Display Ribbon Icon')
+			.setDesc('Whether to show the ribbon icon in the left sidebar')
+			.addToggle((toggle) => toggle.setValue(this.plugin.settings.ribbonIcon).onChange(async (value) => {
+				this.plugin.settings.ribbonIcon = value;
+				await this.plugin.saveSettings();
+				// Reload the plugin to apply changes to the ribbon icon
+				window.location.reload();
+			}));
+
+		new Setting(containerEl)
+			.setName('Ribbon opens via `code`')
+			.setDesc('Whether the ribbon button should use the `code` command or the URL method')
+			.addToggle((toggle) => toggle.setValue(this.plugin.settings.ribbonMethodCode).onChange(async (value) => {
+				this.plugin.settings.ribbonMethodCode = value;
+				await this.plugin.saveSettings();
+			}));
+
+		new Setting(containerEl)
+			.setName('Code Command Template')
+			.setDesc('Template for the command to open VSCode')
+			.addTextArea((text) => text.setValue(this.plugin.settings.codeCommandTemplate).onChange(async (value) => {
+				this.plugin.settings.codeCommandTemplate = value;
+				await this.plugin.saveSettings();
+			}));
+
+		new Setting(containerEl)
+			.setName('Open current file (URL method)')
+			.setDesc('Whether to open the current file rather than the entire vault')
+			.addToggle((toggle) => toggle.setValue(this.plugin.settings.urlOpenFile).onChange(async (value) => {
+				this.plugin.settings.urlOpenFile = value;
+				await this.plugin.saveSettings();
+			}));
+
+		new Setting(containerEl)
+			.setName('VSCode Workspace Path (URL method)')
+			.setDesc('Path to the VSCode workspace file')
+			.addText((text) => text.setValue(this.plugin.settings.urlWorkspacePath).onChange(async (value) => {
+				this.plugin.settings.urlWorkspacePath = value;
+				await this.plugin.saveSettings();
+			}));
+
+		new Setting(containerEl)
+			.setName('VSCode URL Protocol')
+			.setDesc('Protocol to use for opening VSCode')
+			.addText((text) => text.setValue(this.plugin.settings.urlProtocol).onChange(async (value) => {
+				this.plugin.settings.urlProtocol = value;
+				await this.plugin.saveSettings();
+			}));
 	}
 }
 
