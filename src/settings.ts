@@ -10,6 +10,10 @@ export interface MyPluginSettings {
 	urlOpenFile: boolean;
 	urlWorkspacePath: string;
 	urlProtocol: string;
+	// AI Image Analysis settings
+	visionApiKey: string;
+	visionApiEndpoint: string;
+	visionModel: string;
 }
 
 export const DEFAULT_SETTINGS: MyPluginSettings = {
@@ -20,7 +24,11 @@ export const DEFAULT_SETTINGS: MyPluginSettings = {
 	codeCommandTemplate: 'code "{{vaultpath}}" "{{vaultpath}}/{{filepath}}"',
 	urlOpenFile: false,
 	urlWorkspacePath: "{{vaultpath}}",
-	urlProtocol: "vscode://"
+	urlProtocol: "vscode://",
+	// AI Image Analysis default settings
+	visionApiKey: "",
+	visionApiEndpoint: "https://ark.cn-beijing.volces.com/api/v3/responses",
+	visionModel: "doubao-seed-1-6-250815"
 };
 
 export class SampleSettingTab extends PluginSettingTab {
@@ -103,5 +111,39 @@ export class SampleSettingTab extends PluginSettingTab {
 				this.plugin.settings.urlProtocol = value;
 				await this.plugin.saveSettings();
 			}));
+
+		// AI Image Analysis settings
+		containerEl.createEl('h2', { text: 'AI Image Analysis Settings' });
+
+		new Setting(containerEl)
+			.setName('API Key')
+			.setDesc('视觉模型 API Key')
+			.addText((text) => text
+				.setPlaceholder('请输入 API Key')
+				.setValue(this.plugin.settings.visionApiKey)
+				.onChange(async (value) => {
+					this.plugin.settings.visionApiKey = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('API Endpoint')
+			.setDesc('API 请求地址')
+			.addText((text) => text
+				.setValue(this.plugin.settings.visionApiEndpoint)
+				.onChange(async (value) => {
+					this.plugin.settings.visionApiEndpoint = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('模型名称')
+			.setDesc('使用的视觉模型')
+			.addText((text) => text
+				.setValue(this.plugin.settings.visionModel)
+				.onChange(async (value) => {
+					this.plugin.settings.visionModel = value;
+					await this.plugin.saveSettings();
+				}));
 	}
 }

@@ -1,5 +1,6 @@
 import { Editor, MarkdownView } from 'obsidian';
 import MyPlugin from './main';
+import { processCurrentNote, VisionApiConfig } from './ai-image-analysis';
 
 /**
  * Wrap selected content with HTML tags
@@ -121,5 +122,19 @@ export function registerCommands(plugin: MyPlugin) {
 			selectedText = selectedText.replace(/\n/g, '\r\n');
 			await navigator.clipboard.writeText(selectedText);
 		},
+	});
+
+	// AI Image Analysis command
+	plugin.addCommand({
+		id: 'analyze-note-with-ai',
+		name: 'AI 分析当前笔记（图片解析）',
+		callback: async () => {
+			const config: VisionApiConfig = {
+				apiKey: plugin.settings.visionApiKey,
+				apiEndpoint: plugin.settings.visionApiEndpoint,
+				model: plugin.settings.visionModel
+			};
+			await processCurrentNote(plugin.app, config);
+		}
 	});
 }
