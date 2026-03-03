@@ -1,6 +1,6 @@
 import { Editor, MarkdownView } from 'obsidian';
 import MyPlugin from './main';
-import { processCurrentNote, VisionApiConfig } from './ai-image-analysis';
+import { processCurrentNote, LLMApiConfig } from './ai-image-analysis';
 
 /**
  * Wrap selected content with HTML tags
@@ -129,7 +129,7 @@ export function registerCommands(plugin: MyPlugin) {
 		id: 'analyze-note-with-ai',
 		name: 'AI 分析当前笔记（图片解析）',
 		callback: async () => {
-			const config: VisionApiConfig = {
+			const config: LLMApiConfig = {
 				apiKey: plugin.settings.visionApiKey,
 				apiEndpoint: plugin.settings.visionApiEndpoint,
 				model: plugin.settings.visionModel

@@ -124,3 +124,27 @@ export interface OpenAIChatResponse {
 		total_tokens: number;
 	};
 }
+
+// === 新增：单图分析相关类型 ===
+
+// Callout 块信息
+export interface CalloutInfo {
+	startOffset: number;
+	endOffset: number;
+	type: string;      // "AI"
+	title: string;     // "🤖 AI 视觉解析"
+	content: string;   // Callout 内的完整内容
+}
+
+// 单图分析选项
+export interface AnalyzeSingleImageOptions {
+	imageIndex: number;
+	useEnhancedPrompt?: boolean;  // 默认 true
+}
+
+// 单图分析结果
+export interface AnalyzeSingleImageResult {
+	imageIndex: number;
+	analysis: string;
+	uploadResult?: any;  // UploadResult
+}

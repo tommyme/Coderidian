@@ -1,9 +1,10 @@
 import { App, Notice } from 'obsidian';
 import {
 	parseNote,
-	VisionApiConfig,
+	LLMApiConfig,
 	analyzeNote
 } from './index';
+import { AIAnalysisCalloutManager } from './editor-widget/callout-manager';
 
 /**
  * 解析 AI 返回的 Markdown，提取每个图片的分析内容
@@ -45,7 +46,7 @@ function parseAIAnalysis(aiContent: string): Map<string, string> {
  */
 export async function processCurrentNote(
 	app: App,
-	config: VisionApiConfig
+	config: LLMApiConfig
 ): Promise<void> {
 	const activeFile = app.workspace.getActiveFile();
 	if (!activeFile) {
@@ -73,13 +74,32 @@ export async function processCurrentNote(
 
 		// 2. 调用 AI 分析 - 先上传图片
 		notice.setMessage('正在上传图片...');
-		const aiAnalysis = await analyzeNote(app, parsedNote, config);
+		const result = await analyzeNote(app, parsedNote, config);
 
-		// 3. 解析 AI 响应，提取每个图片的分析内容
+		// 上传完成提示
+		const { uploadStats, analysis: aiAnalysis } = result;
+		if (uploadStats.failed > 0) {
+			new Notice(`图片上传完成: ${uploadStats.success}/${uploadStats.total} 成功，${uploadStats.failed} 张失败`);
+		} else {
+			new Notice(`图片上传完成: ${uploadStats.success}/${uploadStats.total} 成功`);
+		}
+
+		// 没有图片成功上传的情况
+		if (uploadStats.success === 0) {
+			notice.hide();
+			new Notice('没有图片成功上传，无法进行 AI 分析');
+			return;
+		}
+
+		// 3. 开始 AI 分析
+		notice.setMessage('正在调用 AI 分析图片...');
+		new Notice('开始 AI 分析，请稍候...');
+
+		// 4. 解析 AI 响应，提取每个图片的分析内容
 		notice.setMessage('正在解析 AI 响应...');
 		const imageAnalyses = parseAIAnalysis(aiAnalysis);
 
-		// 4. 将分析内容插入到对应图片下方 - 从后往前，避免索引错乱
+		// 5. 将分析内容插入到对应图片下方 - 从后往前，避免索引错乱
 		notice.setMessage('正在更新笔记...');
 		let newContent = parsedNote.content;
 
@@ -90,19 +110,12 @@ export async function processCurrentNote(
 			const analysis = imageAnalyses.get(imageKey);
 
 			if (analysis && img.position) {
-				// 用 > 格式包装内容
-				const quotedContent = analysis
-					.split('\n')
-					.map(line => `> ${line}`)
-					.join('\n');
-
-				const insertText = `\n\n${quotedContent}`;
-				const insertPos = img.position.end.offset;
-
-				newContent =
-					newContent.slice(0, insertPos) +
-					insertText +
-					newContent.slice(insertPos);
+				// 使用 Callout 管理器插入
+				newContent = AIAnalysisCalloutManager.insertAnalysisAtPosition(
+					newContent,
+					analysis,
+					img.position.end.offset
+				);
 			}
 		}
 
