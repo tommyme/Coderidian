@@ -107,6 +107,110 @@ function buildStandardSingleImagePrompt(
 }
 
 /**
+ * 上传单张图片
+ */
+export async function uploadSingleImage(
+	app: App,
+	parsedNote: ParsedNote,
+	imageIndex: number,
+	provider?: UploadProvider,
+	config?: LLMApiConfig
+): Promise<UploadResult> {
+	const image = parsedNote.images[imageIndex];
+
+	if (!image) {
+		throw new Error(`图片 image-${imageIndex + 1} 不存在`);
+	}
+
+	// 如果没有提供 provider，则创建默认的
+	let uploadProvider = provider;
+	if (!uploadProvider && config) {
+		uploadProvider = createDefaultProvider(config);
+	}
+
+	if (!uploadProvider) {
+		throw new Error('需要提供 uploadProvider 或 config');
+	}
+
+	const vaultPath = image.vaultPath;
+	if (!vaultPath) {
+		throw new Error(`图片 image-${imageIndex + 1} 没有 vaultPath`);
+	}
+
+	const targetFile = app.vault.getAbstractFileByPath(vaultPath);
+	if (!targetFile || !(targetFile instanceof TFile)) {
+		throw new Error(`图片 image-${imageIndex + 1} 文件不存在`);
+	}
+
+	const uploadResult = await uploadProvider.upload(app, targetFile);
+	if (!uploadResult) {
+		throw new Error(`图片 image-${imageIndex + 1} 上传失败`);
+	}
+
+	return uploadResult;
+}
+
+/**
+ * 分析单张图片（使用已上传的图片）
+ */
+export async function analyzeImageWithUploadResult(
+	parsedNote: ParsedNote,
+	imageIndex: number,
+	uploadResult: UploadResult,
+	config: LLMApiConfig,
+	options: { useEnhancedPrompt?: boolean } = {}
+): Promise<string> {
+	const { useEnhancedPrompt = true } = options;
+
+	// 提取上下文
+	const context = extractImageContext(parsedNote, imageIndex);
+
+	// 构建提示词
+	const systemPrompt = useEnhancedPrompt
+		? buildEnhancedSingleImagePrompt(parsedNote.content, imageIndex, context)
+		: buildStandardSingleImagePrompt(parsedNote.content, imageIndex, context);
+
+	// 构建请求内容
+	const userContent: ResponsesContent[] = [
+		{ type: 'input_text', text: '以下是需要分析的图片：' }
+	];
+
+	if (uploadResult.type === 'file_id') {
+		userContent.push({ type: 'input_image', file_id: uploadResult.id });
+	} else if (uploadResult.type === 'url') {
+		userContent.push({ type: 'input_image', image_url: uploadResult.id });
+	}
+
+	const input: ResponsesMessage[] = [
+		{
+			role: 'system',
+			content: [{ type: 'input_text', text: systemPrompt }]
+		},
+		{
+			role: 'user',
+			content: userContent
+		}
+	];
+
+	// 调用 API
+	let analysisText = '';
+
+	if (config.requestMethod === 'requesturl') {
+		// 使用 requestUrl 方式调用
+		analysisText = await callApiWithRequestUrl(config, input);
+	} else {
+		// 使用 OpenAI SDK 方式调用（默认）
+		analysisText = await callApiWithOpenAI(config, input);
+	}
+
+	if (!analysisText) {
+		throw new Error('API 返回格式异常');
+	}
+
+	return analysisText;
+}
+
+/**
  * 分析单张图片（带完整上下文）
  */
 export async function analyzeSingleImage(
@@ -130,67 +234,20 @@ export async function analyzeSingleImage(
 	}
 
 	// 2. 上传单张图片
-	let uploadResult: UploadResult | null = null;
-	if (image.vaultPath) {
-		const targetFile = app.vault.getAbstractFileByPath(image.vaultPath);
-		if (targetFile && targetFile instanceof TFile) {
-			uploadResult = await provider.upload(app, targetFile);
-		}
-	}
+	const uploadResult = await uploadSingleImage(app, parsedNote, imageIndex, provider);
 
-	if (!uploadResult) {
-		throw new Error(`图片 image-${imageIndex + 1} 上传失败`);
-	}
-
-	// 3. 提取上下文
-	const context = extractImageContext(parsedNote, imageIndex);
-
-	// 4. 构建提示词
-	const systemPrompt = useEnhancedPrompt
-		? buildEnhancedSingleImagePrompt(parsedNote.content, imageIndex, context)
-		: buildStandardSingleImagePrompt(parsedNote.content, imageIndex, context);
-
-	// 5. 构建请求内容
-	const userContent: ResponsesContent[] = [
-		{ type: 'input_text', text: '以下是需要分析的图片：' }
-	];
-
-	if (uploadResult.type === 'file_id') {
-		userContent.push({ type: 'input_image', file_id: uploadResult.id });
-	} else if (uploadResult.type === 'url') {
-		userContent.push({ type: 'input_image', image_url: uploadResult.id });
-	}
-
-	const input: ResponsesMessage[] = [
-		{
-			role: 'system',
-			content: [{ type: 'input_text', text: systemPrompt }]
-		},
-		{
-			role: 'user',
-			content: userContent
-		}
-	];
-
-
-	// 6. 调用 API
-	let analysisText = '';
-
-	if (config.requestMethod === 'requesturl') {
-		// 使用 requestUrl 方式调用
-		analysisText = await callApiWithRequestUrl(config, input);
-	} else {
-		// 使用 OpenAI SDK 方式调用（默认）
-		analysisText = await callApiWithOpenAI(config, input);
-	}
-
-	if (!analysisText) {
-		throw new Error('API 返回格式异常');
-	}
+	// 3. 分析图片
+	const analysis = await analyzeImageWithUploadResult(
+		parsedNote,
+		imageIndex,
+		uploadResult,
+		config,
+		{ useEnhancedPrompt }
+	);
 
 	return {
 		imageIndex,
-		analysis: analysisText,
+		analysis,
 		uploadResult
 	};
 }
@@ -227,8 +284,6 @@ async function callApiWithOpenAI(config: LLMApiConfig, input: ResponsesMessage[]
 		input: input
 	});
 
-	console.log('API 响应:', response);
-
 	// 提取结果
 	let analysisText = '';
 	if (response.output && response.output.length > 0) {
@@ -262,7 +317,6 @@ async function callApiWithRequestUrl(config: LLMApiConfig, input: ResponsesMessa
 		},
 		body: JSON.stringify(requestBody)
 	});
-	console.log("hello here 1");
 	if (response.status !== 200) {
 		const errorMsg = `API 请求失败: ${response.status} - ${response.text}`;
 		console.error(response);
@@ -270,7 +324,6 @@ async function callApiWithRequestUrl(config: LLMApiConfig, input: ResponsesMessa
 	}
 
 	const result = response.json;
-	console.log('API 响应:', result);
 
 	// 提取结果
 	let analysisText = '';

@@ -105,6 +105,10 @@ export class HttpInterceptor {
 		try {
 			// 1. 应用请求拦截器
 			let modifiedParams = params;
+			
+			// 强制关闭 HTTP 错误自动抛出异常的行为
+			modifiedParams.throw = false;
+
 			for (const entry of this.requestInterceptors) {
 				console.group(`📤 Request Interceptor - ${entry.name}`);
 				modifiedParams = await entry.interceptor(modifiedParams);
@@ -121,8 +125,6 @@ export class HttpInterceptor {
 				modifiedResponse = await entry.interceptor(modifiedResponse, modifiedParams);
 				console.groupEnd();
 			}
-
-			console.log(`✅ ${modifiedParams.method} ${modifiedParams.url} - ${modifiedResponse.status} (${Date.now() - startTime}ms)`);
 
 			return modifiedResponse;
 		} catch (error) {
@@ -219,8 +221,55 @@ export function createDefaultRequestInterceptor(): RequestInterceptor {
 		console.log('📦 Body:', bodyData);
 		console.log('📨 Headers:', config.headers);
 
+		// 生成等价的 curl 命令
+		const curlCommand = generateCurlCommand(config);
+		console.log('🐚 Curl:\n', curlCommand);
+
 		return config;
 	};
+}
+
+/**
+ * 基于请求配置生成等价的 curl 命令
+ */
+function generateCurlCommand(config: RequestUrlParam): string {
+	const parts: string[] = ['curl', '-i'];
+
+	// URL 放最前面
+	parts.push(`'${config.url}'`);
+
+	// 方法
+	if (config.method && config.method !== 'GET') {
+		parts.push(`-X ${config.method}`);
+	}
+
+	// Headers
+	if (config.headers) {
+		for (const [key, value] of Object.entries(config.headers)) {
+			if (value !== undefined) {
+				parts.push(`-H '${key}: ${value}'`);
+			}
+		}
+	}
+
+	// Body
+	if (config.body) {
+		if (typeof config.body === 'string') {
+			// 尝试解析 JSON
+			try {
+				const json = JSON.parse(config.body);
+				parts.push(`--data-raw '${JSON.stringify(json).replace(/'/g, "\\'")}'`);
+			} catch {
+				// 如果不是 JSON，直接使用
+				const escaped = config.body.replace(/'/g, "\\'");
+				parts.push(`--data-raw '${escaped}'`);
+			}
+		} else {
+			parts.push(`--data-raw '[${typeof config.body}]'`);
+		}
+	}
+
+	return parts.join(' \\\n  ');
 }
 
 /**

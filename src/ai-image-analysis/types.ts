@@ -80,7 +80,7 @@ export interface DoubaoApiResponse {
 // OpenAI 兼容的 Chat Completions 类型
 export interface OpenAIChatRequest {
 	model: string;
-	messages: Array<OpenAIChatMessage>;
+	input: Array<OpenAIChatMessage>;
 	max_tokens?: number;
 	temperature?: number;
 }

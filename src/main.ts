@@ -7,7 +7,8 @@ import { registerCodeBlockProcessors } from './services/code-blocks';
 import {
 	parseNote,
 	LLMApiConfig,
-	analyzeSingleImage,
+	uploadSingleImage,
+	analyzeImageWithUploadResult,
 	SingleImageRenderer,
 	ImageToolbarManager,
 	ToolbarButton
@@ -151,20 +152,26 @@ export default class MyPlugin extends Plugin {
 				return;
 			}
 
-			// 2. 分析单张图片
+			// 2. 上传图片
 			notice.setMessage('正在上传图片...');
-			new Notice('正在上传图片...');
 
-			const result = await analyzeSingleImage(this.app, parsedNote, config, {
+			const uploadResult = await uploadSingleImage(this.app, parsedNote, imageIndex, undefined, config);
+
+			// 3. 分析图片
+			notice.setMessage('正在分析图片...');
+
+			const analysis = await analyzeImageWithUploadResult(
+				parsedNote,
 				imageIndex,
-				useEnhancedPrompt: true
-			});
+				uploadResult,
+				config,
+				{ useEnhancedPrompt: true }
+			);
 
-			// 3. 插入结果
+			// 4. 插入结果
 			notice.setMessage('正在更新笔记...');
-			new Notice('正在分析图片，请稍候...');
 
-			SingleImageRenderer.insertAnalysis(editor, parsedNote, imageIndex, result.analysis);
+			SingleImageRenderer.insertAnalysis(editor, parsedNote, imageIndex, analysis);
 
 			notice.hide();
 			new Notice(`图片 ${imageIndex + 1} 分析完成！`);
