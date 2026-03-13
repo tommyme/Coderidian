@@ -1,5 +1,6 @@
 import { MarkdownView, Notice, Plugin, addIcon, Editor } from 'obsidian';
 import { MyPluginSettings, DEFAULT_SETTINGS, SampleSettingTab } from './settings';
+import { ApiConfigItem } from './config/api-config-manager';
 import { registerCommands } from './commands';
 import { VSCodeService } from './services/vscode';
 import { registerCodeBlockProcessors } from './services/code-blocks';
@@ -11,7 +12,7 @@ import {
 	ImageToolbarManager,
 	ToolbarButton
 } from './ai-image-analysis';
-import { HttpInterceptor, createHttpInterceptor } from './interceptors';
+import { createHttpInterceptor } from './interceptors';
 
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
@@ -94,6 +95,34 @@ export default class MyPlugin extends Plugin {
 	}
 
 	/**
+	 * 获取当前激活的 API 配置
+	 */
+	private getActiveApiConfig(): LLMApiConfig | null {
+		// 如果使用 Claude Code 配置，暂时不支持（后续可扩展）
+		if (this.settings.useClaudeCodeConfig) {
+			new Notice('请先在设置中添加自定义配置');
+			return null;
+		}
+
+		// 从自定义配置中查找
+		const activeConfig = this.settings.apiConfigs.find(
+			(c: ApiConfigItem) => c.id === this.settings.activeConfigId
+		);
+
+		if (!activeConfig) {
+			return null;
+		}
+
+		return {
+			apiKey: activeConfig.apiKey,
+			apiEndpoint: activeConfig.apiEndpoint,
+			fileApiEndpoint: activeConfig.fileApiEndpoint,
+			model: activeConfig.model,
+			requestMethod: activeConfig.requestMethod
+		};
+	}
+
+	/**
 	 * 处理单图分析
 	 */
 	private async handleAnalyzeSingleImage(imageIndex: number, editor: Editor): Promise<void> {
@@ -103,16 +132,11 @@ export default class MyPlugin extends Plugin {
 			return;
 		}
 
-		if (!this.settings.visionApiKey) {
-			new Notice('请先在设置中配置 API Key');
+		const config = this.getActiveApiConfig();
+		if (!config) {
+			new Notice('请先在设置中配置 API');
 			return;
 		}
-
-		const config: LLMApiConfig = {
-			apiKey: this.settings.visionApiKey,
-			apiEndpoint: this.settings.visionApiEndpoint,
-			model: this.settings.visionModel
-		};
 
 		const notice = new Notice(`正在分析图片 ${imageIndex + 1}...`, 0);
 
@@ -159,36 +183,12 @@ export default class MyPlugin extends Plugin {
 	 * 设置 HTTP 请求拦截器
 	 */
 	private setupHttpInterceptor(): void {
-		createHttpInterceptor();
-		console.log('[Coderidian] HTTP Interceptor initialized');
-
-		// 根据设置添加日志拦截器
+		// 根据设置决定是否启用拦截器
 		if (this.settings.enableHttpLogging) {
-			this.updateHttpLogging(true);
-		}
-	}
-
-	/**
-	 * 动态更新 HTTP 日志拦截器
-	 */
-	updateHttpLogging(enabled: boolean): void {
-		const interceptor = HttpInterceptor.getInstance();
-
-		if (enabled) {
-			// 添加日志拦截器
-			interceptor.addRequestInterceptor(
-				HttpInterceptor.createRequestLoggerInterceptor(),
-				'request-logger'
-			);
-			interceptor.addResponseInterceptor(
-				HttpInterceptor.createResponseLoggerInterceptor(),
-				'response-logger'
-			);
-			console.log('[HttpInterceptor] Logging interceptors enabled');
+			createHttpInterceptor();
+			console.log('[Coderidian] HTTP Interceptor enabled');
 		} else {
-			// 清除所有拦截器
-			interceptor.clearInterceptors();
-			console.log('[HttpInterceptor] Logging interceptors disabled');
+			console.log('[Coderidian] HTTP Interceptor disabled');
 		}
 	}
 

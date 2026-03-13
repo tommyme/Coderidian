@@ -2,6 +2,8 @@ import { Editor, MarkdownView, Notice } from 'obsidian';
 import MyPlugin from './main';
 import { processCurrentNote, LLMApiConfig } from './ai-image-analysis';
 import { HttpInterceptor } from './interceptors';
+import { ConfirmModal, zipVault } from './utils';
+import { existsSync } from 'fs';
 
 /**
  * Wrap selected content with HTML tags
@@ -107,7 +109,7 @@ export function registerCommands(plugin: MyPlugin) {
 			const zipFilePath = `${vaultPath}.zip`;
 
 			if (existsSync(zipFilePath)) {
-				new ConfirmModal(() => zipVault(vaultPath, zipFilePath, true)).open();
+				new ConfirmModal(plugin.app, () => zipVault(vaultPath, zipFilePath, true)).open();
 			} else {
 				await zipVault(vaultPath, zipFilePath, false);
 			}
@@ -133,6 +135,7 @@ export function registerCommands(plugin: MyPlugin) {
 			const config: LLMApiConfig = {
 				apiKey: plugin.settings.visionApiKey,
 				apiEndpoint: plugin.settings.visionApiEndpoint,
+				fileApiEndpoint: plugin.settings.visionFileApiEndpoint,
 				model: plugin.settings.visionModel
 			};
 			await processCurrentNote(plugin.app, config);

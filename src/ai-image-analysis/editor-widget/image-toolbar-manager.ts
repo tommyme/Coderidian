@@ -27,6 +27,7 @@ export class ImageToolbarManager {
 	private pathToIndexMap: Map<string, number> = new Map();
 	private currentFile: TFile | null = null;
 	private currentEmbed: HTMLElement | null = null;
+	private hideTimeout: number | null = null;
 	private styleEl: HTMLStyleElement | null = null;
 
 	// 事件监听引用，用于清理
@@ -189,7 +190,10 @@ export class ImageToolbarManager {
 			if (embed) {
 				const relatedTarget = e.relatedTarget as HTMLElement | null;
 				if (!relatedTarget || !(embed.contains(relatedTarget) || this.toolbar.contains(relatedTarget))) {
-					this.hideToolbar(embed);
+					// 延迟隐藏工具栏，让用户有时间把鼠标移到工具栏上
+					this.hideTimeout = window.setTimeout(() => {
+						this.hideToolbar(embed);
+					}, 500);
 				}
 			}
 		};
@@ -199,7 +203,11 @@ export class ImageToolbarManager {
 
 		// 工具栏自己的事件
 		this.toolbar.addEventListener('mouseenter', () => {
-			// 鼠标进入工具栏，保持显示
+			// 鼠标进入工具栏，清除隐藏超时，保持显示
+			if (this.hideTimeout !== null) {
+				window.clearTimeout(this.hideTimeout);
+				this.hideTimeout = null;
+			}
 		});
 		this.toolbar.addEventListener('mouseleave', (e) => {
 			const relatedTarget = e.relatedTarget as HTMLElement | null;
@@ -227,6 +235,12 @@ export class ImageToolbarManager {
 	 * 显示工具栏
 	 */
 	private showToolbar(embed: HTMLElement): void {
+		// 清除隐藏超时
+		if (this.hideTimeout !== null) {
+			window.clearTimeout(this.hideTimeout);
+			this.hideTimeout = null;
+		}
+
 		// 先移除其他图片的 hover 类
 		const allEmbeds = embed.parentElement?.querySelectorAll(`.${HOVERED_CLASS}`);
 		allEmbeds?.forEach(el => el.classList.remove(HOVERED_CLASS));
@@ -283,6 +297,11 @@ export class ImageToolbarManager {
 	 * 隐藏工具栏
 	 */
 	private hideToolbar(embed: HTMLElement): void {
+		// 清除隐藏超时
+		if (this.hideTimeout !== null) {
+			window.clearTimeout(this.hideTimeout);
+			this.hideTimeout = null;
+		}
 		embed.classList.remove(HOVERED_CLASS);
 		this.toolbar.style.display = 'none';
 		if (this.currentEmbed === embed) {
@@ -294,6 +313,12 @@ export class ImageToolbarManager {
 	 * 解绑
 	 */
 	detach(): void {
+		// 清除隐藏超时
+		if (this.hideTimeout !== null) {
+			window.clearTimeout(this.hideTimeout);
+			this.hideTimeout = null;
+		}
+
 		// 移除事件监听
 		if (this.mouseEnterHandler && this.currentFile) {
 			const view = this.app.workspace.getActiveViewOfType(MarkdownView);

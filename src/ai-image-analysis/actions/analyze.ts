@@ -14,12 +14,9 @@ import {
 export interface LLMApiConfig {
 	apiKey: string;
 	apiEndpoint: string;
+	fileApiEndpoint: string;
 	model: string;
-}
-
-export interface ImageAnalysisResult {
-	imageIndex: number;
-	analysis: string;
+	requestMethod?: 'openai' | 'requesturl';
 }
 
 /**
@@ -243,11 +240,13 @@ ${parsedNote.contentWithPlaceholders}
 
 /**
  * 创建默认的 OpenAI 兼容文件上传 Provider
+ * 如果 fileApiEndpoint 为空，则复用 apiEndpoint
  */
 function createDefaultProvider(config: LLMApiConfig): UploadProvider {
+	const fileEndpoint = config.fileApiEndpoint || config.apiEndpoint;
 	const providerConfig: OpenAIFileProviderConfig = {
 		apiKey: config.apiKey,
-		apiEndpoint: config.apiEndpoint,
+		apiEndpoint: fileEndpoint,
 		maxRetries: 3,
 		timeout: 30000
 	};

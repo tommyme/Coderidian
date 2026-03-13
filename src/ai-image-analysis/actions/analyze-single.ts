@@ -1,5 +1,4 @@
-import { App, TFile } from 'obsidian';
-import OpenAI from 'openai';
+import { App, TFile, requestUrl } from 'obsidian';
 import { ParsedNote, AnalyzeSingleImageOptions, AnalyzeSingleImageResult } from '../types';
 import { ResponsesContent, ResponsesMessage } from '../api/llm-api';
 import {
@@ -173,32 +172,16 @@ export async function analyzeSingleImage(
 		}
 	];
 
-	console.log(`单图分析 image-${imageIndex + 1} - API 请求:`, JSON.stringify({ model: config.model }, null, 2));
 
 	// 6. 调用 API
-	const baseUrl = config.apiEndpoint.replace(/\/responses$/, '');
-	const openai = new OpenAI({
-		apiKey: config.apiKey,
-		baseURL: baseUrl,
-		dangerouslyAllowBrowser: true
-	});
-
-	const response = await (openai as any).responses.create({
-		model: config.model,
-		input: input
-	});
-
-	console.log(`单图分析 image-${imageIndex + 1} - API 响应:`, response);
-
-	// 7. 提取结果
 	let analysisText = '';
-	if (response.output && response.output.length > 0) {
-		for (const out of response.output) {
-			if (out.type === 'message' && out.content && out.content.length > 0) {
-				analysisText = out.content[0].text;
-				break;
-			}
-		}
+
+	if (config.requestMethod === 'requesturl') {
+		// 使用 requestUrl 方式调用
+		analysisText = await callApiWithRequestUrl(config, input);
+	} else {
+		// 使用 OpenAI SDK 方式调用（默认）
+		analysisText = await callApiWithOpenAI(config, input);
 	}
 
 	if (!analysisText) {
@@ -214,13 +197,91 @@ export async function analyzeSingleImage(
 
 /**
  * 创建默认的 OpenAI 兼容文件上传 Provider
+ * 如果 fileApiEndpoint 为空，则复用 apiEndpoint
  */
 function createDefaultProvider(config: LLMApiConfig): UploadProvider {
+	const fileEndpoint = config.fileApiEndpoint || config.apiEndpoint;
 	const providerConfig: OpenAIFileProviderConfig = {
 		apiKey: config.apiKey,
-		apiEndpoint: config.apiEndpoint,
+		apiEndpoint: fileEndpoint,
 		maxRetries: 3,
 		timeout: 30000
 	};
 	return new OpenAIFileUploadProvider(providerConfig);
+}
+
+/**
+ * 使用 OpenAI SDK 调用 API
+ */
+async function callApiWithOpenAI(config: LLMApiConfig, input: ResponsesMessage[]): Promise<string> {
+	const OpenAI = await import('openai');
+	const baseUrl = config.apiEndpoint.replace(/\/responses$/, '');
+	const openai = new OpenAI.default({
+		apiKey: config.apiKey,
+		baseURL: baseUrl,
+		dangerouslyAllowBrowser: true
+	});
+
+	const response = await (openai as any).responses.create({
+		model: config.model,
+		input: input
+	});
+
+	console.log('API 响应:', response);
+
+	// 提取结果
+	let analysisText = '';
+	if (response.output && response.output.length > 0) {
+		for (const out of response.output) {
+			if (out.type === 'message' && out.content && out.content.length > 0) {
+				analysisText = out.content[0].text;
+				break;
+			}
+		}
+	}
+
+	return analysisText;
+}
+
+/**
+ * 使用 requestUrl 调用 API
+ */
+async function callApiWithRequestUrl(config: LLMApiConfig, input: ResponsesMessage[]): Promise<string> {
+	// 构建请求体
+	const requestBody = {
+		model: config.model,
+		input: input
+	};
+	// 使用 requestUrl
+	const response = await window.requestUrl({
+		url: config.apiEndpoint,
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'Authorization': `Bearer ${config.apiKey}`
+		},
+		body: JSON.stringify(requestBody)
+	});
+	console.log("hello here 1");
+	if (response.status !== 200) {
+		const errorMsg = `API 请求失败: ${response.status} - ${response.text}`;
+		console.error(response);
+		throw new Error(errorMsg);
+	}
+
+	const result = response.json;
+	console.log('API 响应:', result);
+
+	// 提取结果
+	let analysisText = '';
+	if (result.output && result.output.length > 0) {
+		for (const out of result.output) {
+			if (out.type === 'message' && out.content && out.content.length > 0) {
+				analysisText = out.content[0].text;
+				break;
+			}
+		}
+	}
+
+	return analysisText;
 }
