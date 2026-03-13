@@ -1,6 +1,7 @@
-import { Editor, MarkdownView } from 'obsidian';
+import { Editor, MarkdownView, Notice } from 'obsidian';
 import MyPlugin from './main';
 import { processCurrentNote, LLMApiConfig } from './ai-image-analysis';
+import { HttpInterceptor } from './interceptors';
 
 /**
  * Wrap selected content with HTML tags
@@ -135,6 +136,53 @@ export function registerCommands(plugin: MyPlugin) {
 				model: plugin.settings.visionModel
 			};
 			await processCurrentNote(plugin.app, config);
+		}
+	});
+
+	// HTTP Interceptor: Clear all interceptors
+	plugin.addCommand({
+		id: 'http-interceptor-clear',
+		name: 'HTTP Interceptor: Clear All',
+		callback: () => {
+			const interceptor = HttpInterceptor.getInstance();
+			interceptor.clearInterceptors();
+			new Notice('All interceptors cleared');
+			console.log('[HttpInterceptor] All interceptors cleared');
+		}
+	});
+
+	// HTTP Interceptor: Test request
+	plugin.addCommand({
+		id: 'http-interceptor-test',
+		name: 'HTTP Interceptor: Test Request',
+		callback: async () => {
+			new Notice('Sending GET and POST requests...', 0);
+			try {
+				// Send GET request
+				const getResponse = await (globalThis as any).requestUrl({
+					url: 'https://httpbin.org/get?foo=bar&test=123',
+					method: 'GET',
+					headers: {
+						'X-Test-Header': 'Coderidian-Test'
+					}
+				});
+				// Send POST request
+				const postResponse = await (globalThis as any).requestUrl({
+					url: 'https://httpbin.org/post',
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'X-Test-Header': 'Coderidian-Post'
+					},
+					body: JSON.stringify({
+						name: 'Coderidian',
+						features: ['interceptor', 'cache', 'retry']
+					})
+				});
+			} catch (err) {
+				new Notice(`Request failed: ${err instanceof Error ? err.message : String(err)}`);
+				console.error('[Test] Error:', err);
+			}
 		}
 	});
 }

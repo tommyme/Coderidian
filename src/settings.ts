@@ -14,6 +14,8 @@ export interface MyPluginSettings {
 	visionApiKey: string;
 	visionApiEndpoint: string;
 	visionModel: string;
+	// HTTP Interceptor settings
+	enableHttpLogging: boolean;
 }
 
 export const DEFAULT_SETTINGS: MyPluginSettings = {
@@ -28,7 +30,9 @@ export const DEFAULT_SETTINGS: MyPluginSettings = {
 	// AI Image Analysis default settings
 	visionApiKey: "",
 	visionApiEndpoint: "https://ark.cn-beijing.volces.com/api/v3/responses",
-	visionModel: "doubao-seed-1-6-250815"
+	visionModel: "doubao-seed-1-6-250815",
+	// HTTP Interceptor default settings
+	enableHttpLogging: false
 };
 
 export class SampleSettingTab extends PluginSettingTab {
@@ -145,5 +149,18 @@ export class SampleSettingTab extends PluginSettingTab {
 					this.plugin.settings.visionModel = value;
 					await this.plugin.saveSettings();
 				}));
+
+		// HTTP Interceptor settings
+		containerEl.createEl('h2', { text: 'HTTP Interceptor Settings' });
+
+		new Setting(containerEl)
+			.setName('Enable HTTP Logging')
+			.setDesc('Enable request/response logging interceptors for debugging')
+			.addToggle((toggle) => toggle.setValue(this.plugin.settings.enableHttpLogging).onChange(async (value) => {
+				this.plugin.settings.enableHttpLogging = value;
+				await this.plugin.saveSettings();
+				// Dynamically add or remove logging interceptors
+				this.plugin.updateHttpLogging(value);
+			}));
 	}
 }

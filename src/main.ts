@@ -11,6 +11,7 @@ import {
 	ImageToolbarManager,
 	ToolbarButton
 } from './ai-image-analysis';
+import { HttpInterceptor, createHttpInterceptor } from './interceptors';
 
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
@@ -21,6 +22,9 @@ export default class MyPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 		this.vscodeService = new VSCodeService(this.app, this.settings);
+
+		// 初始化 HTTP 请求拦截器
+		this.setupHttpInterceptor();
 
 		this.setupIcons();
 		registerCommands(this);
@@ -149,6 +153,43 @@ export default class MyPlugin extends Plugin {
 
 	onunload() {
 		this.toolbarManager?.destroy();
+	}
+
+	/**
+	 * 设置 HTTP 请求拦截器
+	 */
+	private setupHttpInterceptor(): void {
+		createHttpInterceptor();
+		console.log('[Coderidian] HTTP Interceptor initialized');
+
+		// 根据设置添加日志拦截器
+		if (this.settings.enableHttpLogging) {
+			this.updateHttpLogging(true);
+		}
+	}
+
+	/**
+	 * 动态更新 HTTP 日志拦截器
+	 */
+	updateHttpLogging(enabled: boolean): void {
+		const interceptor = HttpInterceptor.getInstance();
+
+		if (enabled) {
+			// 添加日志拦截器
+			interceptor.addRequestInterceptor(
+				HttpInterceptor.createRequestLoggerInterceptor(),
+				'request-logger'
+			);
+			interceptor.addResponseInterceptor(
+				HttpInterceptor.createResponseLoggerInterceptor(),
+				'response-logger'
+			);
+			console.log('[HttpInterceptor] Logging interceptors enabled');
+		} else {
+			// 清除所有拦截器
+			interceptor.clearInterceptors();
+			console.log('[HttpInterceptor] Logging interceptors disabled');
+		}
 	}
 
 	private setupIcons() {
