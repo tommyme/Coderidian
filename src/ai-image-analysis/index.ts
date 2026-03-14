@@ -1,6 +1,6 @@
 // 导出所有公共 API
 export * from './types';
-export * from './note-parser';
+export * from './provider/note-parser';
 export * from './provider/upload';
 export * from './actions/analyze';
 export * from './actions/analyze-single';

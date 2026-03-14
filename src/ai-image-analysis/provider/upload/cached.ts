@@ -24,8 +24,7 @@ export interface CacheConfig {
  * 带缓存的上传 Provider 包装器
  * 使用图片 MD5 作为缓存键，避免重复上传相同图片
  */
-export class CachedUploadProvider implements UploadProvider {
-	readonly name: string;
+export class CachedFUP implements UploadProvider {
 
 	private provider: UploadProvider;
 	private cache: Map<string, CacheEntry> = new Map();
@@ -33,7 +32,6 @@ export class CachedUploadProvider implements UploadProvider {
 
 	constructor(provider: UploadProvider, config?: CacheConfig) {
 		this.provider = provider;
-		this.name = `cached-${provider.name}`;
 		this.config = {
 			ttl: config?.ttl ?? 60 * 60 * 1000 // 默认 1 小时
 		};

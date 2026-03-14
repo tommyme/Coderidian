@@ -1,19 +1,20 @@
 import { MarkdownView, Notice, Plugin, addIcon, Editor } from 'obsidian';
 import { MyPluginSettings, DEFAULT_SETTINGS, SampleSettingTab } from './settings';
-import { ApiConfigItem } from './config/api-config-manager';
+import { ApiConfigItem, LlmApiManager } from './config/api-config-manager';
+import { getClaudeCodeConfig } from './config/claude-code-config';
 import { registerCommands } from './commands';
 import { VSCodeService } from './services/vscode';
 import { registerCodeBlockProcessors } from './services/code-blocks';
 import {
 	parseNote,
 	LLMApiConfig,
-	uploadSingleImage,
+	uploadAllImages,
 	analyzeImageWithUploadResult,
 	SingleImageRenderer,
 	ImageToolbarManager,
 	ToolbarButton
 } from './ai-image-analysis';
-import { createHttpInterceptor } from './interceptors';
+import { createHttpInterceptor, HttpInterceptor } from './interceptors';
 
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
@@ -24,6 +25,12 @@ export default class MyPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 		this.vscodeService = new VSCodeService(this.app, this.settings);
+
+		// 初始化全局 LLM API 管理器
+		const activeConfig = this.getActiveApiConfig();
+		if (activeConfig) {
+			LlmApiManager.init(activeConfig);
+		}
 
 		// 初始化 HTTP 请求拦截器
 		this.setupHttpInterceptor();
@@ -98,14 +105,8 @@ export default class MyPlugin extends Plugin {
 	/**
 	 * 获取当前激活的 API 配置
 	 */
-	private getActiveApiConfig(): LLMApiConfig | null {
-		// 如果使用 Claude Code 配置，暂时不支持（后续可扩展）
-		if (this.settings.useClaudeCodeConfig) {
-			new Notice('请先在设置中添加自定义配置');
-			return null;
-		}
-
-		// 从自定义配置中查找
+	public getActiveApiConfig(): LLMApiConfig | null {
+		// 从配置中查找
 		const activeConfig = this.settings.apiConfigs.find(
 			(c: ApiConfigItem) => c.id === this.settings.activeConfigId
 		);
@@ -119,7 +120,8 @@ export default class MyPlugin extends Plugin {
 			apiEndpoint: activeConfig.apiEndpoint,
 			fileApiEndpoint: activeConfig.fileApiEndpoint,
 			model: activeConfig.model,
-			requestMethod: activeConfig.requestMethod
+			requestMethod: activeConfig.requestMethod,
+			fileUploadMethod: activeConfig.fileUploadMethod
 		};
 	}
 
@@ -155,7 +157,13 @@ export default class MyPlugin extends Plugin {
 			// 2. 上传图片
 			notice.setMessage('正在上传图片...');
 
-			const uploadResult = await uploadSingleImage(this.app, parsedNote, imageIndex, undefined, config);
+			const image = parsedNote.images[imageIndex];
+			const results = await uploadAllImages(this.app, [image]);
+			if (results.length === 0) {
+				notice.hide();
+				new Notice(`图片上传失败`);
+				return;
+			}
 
 			// 3. 分析图片
 			notice.setMessage('正在分析图片...');
@@ -163,9 +171,7 @@ export default class MyPlugin extends Plugin {
 			const analysis = await analyzeImageWithUploadResult(
 				parsedNote,
 				imageIndex,
-				uploadResult,
-				config,
-				{ useEnhancedPrompt: true }
+				results[0],
 			);
 
 			// 4. 插入结果
@@ -195,8 +201,19 @@ export default class MyPlugin extends Plugin {
 			createHttpInterceptor();
 			console.log('[Coderidian] HTTP Interceptor enabled');
 		} else {
+			const interceptor = HttpInterceptor.getInstance();
+			interceptor.restore();
 			console.log('[Coderidian] HTTP Interceptor disabled');
 		}
+	}
+
+	/**
+	 * 动态更新 HTTP 日志拦截器
+	 */
+	updateHttpLogging(enable: boolean): void {
+		this.settings.enableHttpLogging = enable;
+		// 重新设置拦截器
+		this.setupHttpInterceptor();
 	}
 
 	private setupIcons() {
@@ -228,6 +245,31 @@ export default class MyPlugin extends Plugin {
 
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+
+		// 如果 Claude Code 配置存在，自动添加到 apiConfigs
+		const claudeConfig = await getClaudeCodeConfig(this.app);
+		if (claudeConfig) {
+			// 检查是否已存在
+			const exists = this.settings.apiConfigs.some(c => c.id === 'claude-code');
+			if (!exists) {
+				this.settings.apiConfigs.push({
+					id: 'claude-code',
+					name: 'Claude Code',
+					requestMethod: 'openai',
+					fileUploadMethod: 'requesturl',
+					apiKey: claudeConfig.apiKey,
+					apiEndpoint: claudeConfig.apiEndpoint,
+					fileApiEndpoint: '',
+					model: claudeConfig.model,
+					isPreset: true
+				});
+				// 如果没有激活的配置，默认选中 Claude Code
+				if (!this.settings.activeConfigId) {
+					this.settings.activeConfigId = 'claude-code';
+				}
+				await this.saveSettings();
+			}
+		}
 	}
 
 	async saveSettings() {

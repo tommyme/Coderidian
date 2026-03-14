@@ -1,5 +1,5 @@
 import { App, MarkdownView, TFile, Notice } from 'obsidian';
-import { parseNote } from '../note-parser';
+import { parseNote } from '../provider/note-parser';
 
 /**
  * 工具栏按钮配置

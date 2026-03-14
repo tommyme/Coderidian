@@ -5,6 +5,7 @@ import {
 	analyzeNote
 } from './index';
 import { AIAnalysisCalloutManager } from './editor-widget/callout-manager';
+import { LlmApiManager } from 'src/config/api-config-manager';
 
 /**
  * 解析 AI 返回的 Markdown，提取每个图片的分析内容
@@ -46,7 +47,6 @@ function parseAIAnalysis(aiContent: string): Map<string, string> {
  */
 export async function processCurrentNote(
 	app: App,
-	config: LLMApiConfig
 ): Promise<void> {
 	const activeFile = app.workspace.getActiveFile();
 	if (!activeFile) {
@@ -54,7 +54,7 @@ export async function processCurrentNote(
 		return;
 	}
 
-	if (!config.apiKey) {
+	if (!LlmApiManager.config.apiKey) {
 		new Notice('请先在设置中配置 API Key');
 		return;
 	}
@@ -66,15 +66,9 @@ export async function processCurrentNote(
 		notice.setMessage('正在解析笔记...');
 		const parsedNote = await parseNote(app, activeFile);
 
-		if (parsedNote.images.length === 0) {
-			notice.hide();
-			new Notice('笔记中没有图片');
-			return;
-		}
-
-		// 2. 调用 AI 分析 - 先上传图片
+		// 上传图片
 		notice.setMessage('正在上传图片...');
-		const result = await analyzeNote(app, parsedNote, config);
+		const result = await analyzeNote(app, parsedNote);
 
 		// 上传完成提示
 		const { uploadStats, analysis: aiAnalysis } = result;
@@ -91,12 +85,6 @@ export async function processCurrentNote(
 			return;
 		}
 
-		// 3. 开始 AI 分析
-		notice.setMessage('正在调用 AI 分析图片...');
-		new Notice('开始 AI 分析，请稍候...');
-
-		// 4. 解析 AI 响应，提取每个图片的分析内容
-		notice.setMessage('正在解析 AI 响应...');
 		const imageAnalyses = parseAIAnalysis(aiAnalysis);
 
 		// 5. 将分析内容插入到对应图片下方 - 从后往前，避免索引错乱

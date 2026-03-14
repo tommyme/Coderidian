@@ -9,19 +9,32 @@
 
 import { App } from 'obsidian';
 import { getClaudeCodeConfig, ClaudeCodeEnvConfig } from './claude-code-config';
+import { LLMApiConfig } from '../ai-image-analysis/actions/analyze';
+import { UploadProvider } from '../ai-image-analysis/provider/upload';
+import { OpenAIFUP } from '../ai-image-analysis/provider/upload/upload-openai';
+import { RequestUrlFUP } from '../ai-image-analysis/provider/upload/upload-requesturl';
+import { MinimaxFUP } from '../ai-image-analysis/provider/upload/upload-minimax';
+import { LlmRequestProvider } from '../ai-image-analysis/provider/llm-request/base';
+import { OpenAIRequestProvider, RequestUrlRequestProvider, MinimaxRequestProvider } from '../ai-image-analysis/provider/llm-request';
+import { ResponsesMessage } from 'src/ai-image-analysis/api/llm-api';
 
 /** API 请求方式 */
 export type RequestMethod = 'openai' | 'requesturl';
+
+/** 文件上传方式 */
+export type FileUploadMethod = 'openai' | 'requesturl' | 'minimax';
 
 /** 单个 API 配置项 */
 export interface ApiConfigItem {
 	id: string;
 	name: string;
 	requestMethod: RequestMethod;
+	fileUploadMethod: FileUploadMethod;
 	apiKey: string;
 	apiEndpoint: string;
 	fileApiEndpoint: string;
 	model: string;
+	isPreset?: boolean;  // 是否为预设配置（预设不可删除、不可编辑）
 }
 
 /**
@@ -40,10 +53,11 @@ export function createDefaultConfig(name?: string): ApiConfigItem {
 		id: generateConfigId(),
 		name: name || `custom-${count}`,
 		requestMethod: 'openai',
+		fileUploadMethod: 'openai',
 		apiKey: '',
-		apiEndpoint: 'https://ark.cn-beijing.volces.com/api/v3/responses',
+		apiEndpoint: '',
 		fileApiEndpoint: '',
-		model: 'doubao-seed-1-6-250815'
+		model: ''
 	};
 }
 
@@ -106,4 +120,44 @@ export class ApiConfigManager {
 			throw e;
 		}
 	}
+}
+
+/**
+ * 全局 LLM API 管理器
+ * 提供静态成员直接访问当前配置的 provider
+ */
+export class LlmApiManager {
+	static config: LLMApiConfig;
+	static uploadProvider: UploadProvider;
+	static requestProvider: LlmRequestProvider;
+
+	/**
+	 * 初始化全局管理器
+	 */
+	static init(config: LLMApiConfig): void {
+		this.config = config;
+
+		// 创建上传 Provider
+		if (config.fileUploadMethod === 'minimax') {
+			this.uploadProvider = new MinimaxFUP();
+		} else if (config.fileUploadMethod === 'requesturl') {
+			this.uploadProvider = new RequestUrlFUP();
+		} else {
+			this.uploadProvider = new OpenAIFUP();
+		}
+
+		// 创建请求 Provider
+		if (config.requestMethod === 'minimax') {
+			this.requestProvider = new MinimaxRequestProvider();
+		} else if (config.requestMethod === 'requesturl') {
+			this.requestProvider = new RequestUrlRequestProvider();
+		} else {
+			this.requestProvider = new OpenAIRequestProvider();
+		}
+	}
+
+	static async request(input: ResponsesMessage[]): Promise<string> {
+		return this.requestProvider.request(input);
+	}
+	
 }

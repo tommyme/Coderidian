@@ -51,6 +51,9 @@ export class HttpInterceptor {
 	/** 当前请求的开始时间（用于计算耗时） */
 	private startTimeGetter: (() => number) | null = null;
 
+	/** 原始 requestUrl 函数 */
+	private originalRequestUrl: ((params: RequestUrlParam) => Promise<RequestUrlResponse>) | null = null;
+
 	private constructor() {}
 
 	/**
@@ -74,15 +77,39 @@ export class HttpInterceptor {
 		}
 
 		// 保存原始 requestUrl
-		const originalRequestUrl = requestUrl;
+		this.originalRequestUrl = requestUrl;
 
 		// 替换全局 requestUrl
 		(globalThis as any).requestUrl = async (params: RequestUrlParam) => {
-			return this.handleRequest(params, originalRequestUrl);
+			return this.handleRequest(params, this.originalRequestUrl!);
 		};
 
 		this.initialized = true;
 		console.log('[HttpInterceptor] Initialized');
+	}
+
+	/**
+	 * 恢复原始 requestUrl
+	 * 移除所有拦截器
+	 */
+	restore(): void {
+		if (!this.initialized) {
+			return;
+		}
+
+		// 恢复原始 requestUrl
+		if (this.originalRequestUrl) {
+			(globalThis as any).requestUrl = this.originalRequestUrl;
+			this.originalRequestUrl = null;
+		}
+
+		// 清空拦截器
+		this.requestInterceptors = [];
+		this.responseInterceptors = [];
+		this.errorInterceptors = [];
+
+		this.initialized = false;
+		console.log('[HttpInterceptor] Restored');
 	}
 
 	/**

@@ -1,7 +1,6 @@
 import { Editor, MarkdownView, Notice } from 'obsidian';
 import MyPlugin from './main';
-import { processCurrentNote, LLMApiConfig } from './ai-image-analysis';
-import { HttpInterceptor } from './interceptors';
+import { processCurrentNote } from './ai-image-analysis';
 import { ConfirmModal, zipVault } from './utils';
 import { existsSync } from 'fs';
 
@@ -109,7 +108,12 @@ export function registerCommands(plugin: MyPlugin) {
 			const zipFilePath = `${vaultPath}.zip`;
 
 			if (existsSync(zipFilePath)) {
-				new ConfirmModal(plugin.app, () => zipVault(vaultPath, zipFilePath, true)).open();
+				new ConfirmModal(plugin.app, {
+					title: '确认覆盖',
+					message: '目标 zip 文件已存在，是否覆盖？',
+					confirmText: '覆盖',
+					onConfirm: () => zipVault(vaultPath, zipFilePath, true)
+				}).open();
 			} else {
 				await zipVault(vaultPath, zipFilePath, false);
 			}
@@ -131,27 +135,7 @@ export function registerCommands(plugin: MyPlugin) {
 	plugin.addCommand({
 		id: 'analyze-note-with-ai',
 		name: 'AI 分析当前笔记（图片解析）',
-		callback: async () => {
-			const config: LLMApiConfig = {
-				apiKey: plugin.settings.visionApiKey,
-				apiEndpoint: plugin.settings.visionApiEndpoint,
-				fileApiEndpoint: plugin.settings.visionFileApiEndpoint,
-				model: plugin.settings.visionModel
-			};
-			await processCurrentNote(plugin.app, config);
-		}
-	});
-
-	// HTTP Interceptor: Clear all interceptors
-	plugin.addCommand({
-		id: 'http-interceptor-clear',
-		name: 'HTTP Interceptor: Clear All',
-		callback: () => {
-			const interceptor = HttpInterceptor.getInstance();
-			interceptor.clearInterceptors();
-			new Notice('All interceptors cleared');
-			console.log('[HttpInterceptor] All interceptors cleared');
-		}
+		callback: async () => { await processCurrentNote(plugin.app); }
 	});
 
 	// HTTP Interceptor: Test request

@@ -1,5 +1,5 @@
 import { App, TFile } from 'obsidian';
-import { ContentBlock, TextBlock, ImageBlock, ParsedNote } from './types';
+import { ContentBlock, TextBlock, ImageBlock, ParsedNote } from '../types';
 
 /**
  * 使用 Obsidian 原生 API 解析笔记

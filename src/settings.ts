@@ -1,6 +1,7 @@
-import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, Setting } from 'obsidian';
 import MyPlugin from './main';
-import { ApiConfigItem, RequestMethod, ApiConfigManager, createDefaultConfig } from './config/api-config-manager';
+import { ApiConfigItem, ApiConfigManager, LlmApiManager } from './config/api-config-manager';
+import { ConfigModal } from './utils';
 
 export interface MyPluginSettings {
 	mySetting: string;
@@ -12,7 +13,6 @@ export interface MyPluginSettings {
 	urlWorkspacePath: string;
 	urlProtocol: string;
 	// AI Image Analysis settings
-	useClaudeCodeConfig: boolean;
 	activeConfigId: string;
 	apiConfigs: ApiConfigItem[];
 	// HTTP Interceptor settings
@@ -29,7 +29,6 @@ export const DEFAULT_SETTINGS: MyPluginSettings = {
 	urlWorkspacePath: "{{vaultpath}}",
 	urlProtocol: "vscode://",
 	// AI Image Analysis default settings
-	useClaudeCodeConfig: false,
 	activeConfigId: '',
 	apiConfigs: [],
 	// HTTP Interceptor default settings
@@ -120,217 +119,35 @@ export class SampleSettingTab extends PluginSettingTab {
 		// AI Image Analysis settings
 		containerEl.createEl('h2', { text: 'AI Image Analysis Settings' });
 
-		// 配置管理器
-		const configManager = new ApiConfigManager(this.plugin.app);
-
-		// 预设配置显示
-		containerEl.createEl('h3', { text: '预设配置' });
-		const claudeCodeConfig = await configManager.getClaudeCodeConfig();
-		if (claudeCodeConfig) {
-			new Setting(containerEl)
-				.setName('Claude Code 配置')
-				.setDesc(`模型: ${claudeCodeConfig.model}, Endpoint: ${claudeCodeConfig.apiEndpoint.substring(0, 30)}...`)
-				.addToggle((toggle) => toggle.setValue(this.plugin.settings.useClaudeCodeConfig).onChange(async (value) => {
-					this.plugin.settings.useClaudeCodeConfig = value;
-					await this.plugin.saveSettings();
-					this.display();
-				}));
-		} else {
-			containerEl.createEl('p', { text: '无法读取 Claude Code 配置，请检查 ~/.claude/settings.json', cls: 'setting-item-description' });
-		}
-
-		// 当前激活配置
-		containerEl.createEl('h3', { text: '当前配置' });
-		const configOptions: { label: string; value: string }[] = [
-			{ label: '预设: Claude Code', value: 'claude-code' }
-		];
-		this.plugin.settings.apiConfigs.forEach(config => {
-			configOptions.push({ label: `自定义: ${config.name}`, value: config.id });
-		});
-
+		// 当前使用配置显示
+		const activeConfig = this.plugin.settings.apiConfigs.find(c => c.id === this.plugin.settings.activeConfigId);
 		new Setting(containerEl)
-			.setName('使用配置')
-			.setDesc('选择当前使用的 API 配置')
-			.addDropdown((dropdown) => {
-				dropdown.addOption('claude-code', '预设: Claude Code');
-				this.plugin.settings.apiConfigs.forEach(config => {
-					dropdown.addOption(config.id, `自定义: ${config.name}`);
-				});
-				dropdown.setValue(this.plugin.settings.useClaudeCodeConfig ? 'claude-code' : (this.plugin.settings.activeConfigId || 'claude-code'));
-				dropdown.onChange(async (value) => {
-					if (value === 'claude-code') {
-						this.plugin.settings.useClaudeCodeConfig = true;
-					} else {
-						this.plugin.settings.useClaudeCodeConfig = false;
-						this.plugin.settings.activeConfigId = value;
-					}
-					await this.plugin.saveSettings();
-				});
-			});
-
-		// 自定义配置列表
-		containerEl.createEl('h3', { text: '自定义配置' });
-
-		// 渲染单个配置项
-		const renderConfigItem = (config: ApiConfigItem) => {
-			const configDiv = containerEl.createDiv();
-			configDiv.style.border = '1px solid var(--background-modifier-border)';
-			configDiv.style.borderRadius = '8px';
-			configDiv.style.padding = '12px';
-			configDiv.style.marginBottom = '12px';
-
-			const headerDiv = configDiv.createDiv();
-			headerDiv.style.display = 'flex';
-			headerDiv.style.justifyContent = 'space-between';
-			headerDiv.style.alignItems = 'center';
-			headerDiv.style.marginBottom = '8px';
-
-			headerDiv.createEl('strong', { text: config.name });
-
-			const btnGroup = headerDiv.createDiv();
-			btnGroup.style.display = 'flex';
-			btnGroup.style.gap = '4px';
-
-			const editBtn = btnGroup.createEl('button', { text: '编辑' });
-			const deleteBtn = btnGroup.createEl('button', { text: '删除', cls: 'mod-warning' });
-
-			const detailsDiv = configDiv.createDiv();
-			detailsDiv.style.display = 'none';
-			detailsDiv.style.flexDirection = 'column';
-			detailsDiv.style.gap = '8px';
-
-			// 编辑按钮切换
-			editBtn.addEventListener('click', () => {
-				detailsDiv.style.display = detailsDiv.style.display === 'none' ? 'flex' : 'none';
-			});
-
-			// 删除按钮
-			deleteBtn.addEventListener('click', async () => {
-				this.plugin.settings.apiConfigs = this.plugin.settings.apiConfigs.filter(c => c.id !== config.id);
-				await this.plugin.saveSettings();
-				this.display();
-			});
-
-			// 请求方式
-			new Setting(detailsDiv)
-				.setName('请求方式')
-				.addDropdown((dropdown) => {
-					dropdown.addOption('openai', 'OpenAI SDK');
-					dropdown.addOption('requesturl', 'Obsidian requestUrl');
-					dropdown.setValue(config.requestMethod);
-					dropdown.onChange(async (value) => {
-						config.requestMethod = value as RequestMethod;
-						await this.plugin.saveSettings();
-					});
-				});
-
-			// API Key
-			new Setting(detailsDiv)
-				.setName('API Key')
-				.addText((text) => text
-					.setPlaceholder('API Key')
-					.setValue(config.apiKey)
-					.onChange(async (value) => {
-						config.apiKey = value;
-						await this.plugin.saveSettings();
-					}));
-
-			// API Endpoint
-			new Setting(detailsDiv)
-				.setName('API Endpoint')
-				.addText((text) => text
-					.setPlaceholder('https://api.example.com/v1')
-					.setValue(config.apiEndpoint)
-					.onChange(async (value) => {
-						config.apiEndpoint = value;
-						await this.plugin.saveSettings();
-					}));
-
-			// File API Endpoint
-			new Setting(detailsDiv)
-				.setName('File API Endpoint')
-				.setDesc('文件上传 API（留空复用 API Endpoint）')
-				.addText((text) => text
-					.setPlaceholder('留空则复用 API Endpoint')
-					.setValue(config.fileApiEndpoint)
-					.onChange(async (value) => {
-						config.fileApiEndpoint = value;
-						await this.plugin.saveSettings();
-					}));
-
-			// 模型名称
-			new Setting(detailsDiv)
-				.setName('模型名称')
-				.addText((text) => text
-					.setPlaceholder('模型名称')
-					.setValue(config.model)
-					.onChange(async (value) => {
-						config.model = value;
-						await this.plugin.saveSettings();
-					}));
-		};
-
-		// 渲染现有配置
-		this.plugin.settings.apiConfigs.forEach(config => renderConfigItem(config));
-
-		// 添加新配置按钮
-		new Setting(containerEl)
-			.setName('')
+			.setName('当前使用配置')
+			.setDesc(activeConfig ? `${activeConfig.isPreset ? '预设: ' : '自定义: '}${activeConfig.name}` : '未选择')
 			.addButton((button) => {
-				button.setButtonText('+ 添加新配置');
+				button.setButtonText('查看配置');
 				button.onClick(async () => {
-					const newConfig = createDefaultConfig();
-					this.plugin.settings.apiConfigs.push(newConfig);
-					await this.plugin.saveSettings();
-					this.display();
+					const modal = new ConfigModal(
+						this.app,
+						this.plugin.settings.apiConfigs,
+						this.plugin.settings.activeConfigId,
+						(configs, activeId) => {
+							this.plugin.settings.apiConfigs = configs;
+							this.plugin.settings.activeConfigId = activeId;
+							this.plugin.saveSettings();
+
+							// 更新全局 LLM API 管理器配置
+							const newActiveConfig = this.plugin.getActiveApiConfig();
+							if (newActiveConfig) {
+								LlmApiManager.init(newActiveConfig);
+							}
+
+							this.display();
+						}
+					);
+					modal.open();
 				});
 			});
-
-		// 导入/导出按钮
-		const importExportDiv = containerEl.createDiv();
-		importExportDiv.style.display = 'flex';
-		importExportDiv.style.gap = '8px';
-		importExportDiv.style.marginTop = '8px';
-
-		const exportBtn = importExportDiv.createEl('button', { text: '导出配置' });
-		const importBtn = importExportDiv.createEl('button', { text: '导入配置' });
-
-		exportBtn.addEventListener('click', async () => {
-			const json = configManager.exportConfigs(this.plugin.settings.apiConfigs);
-			const blob = new Blob([json], { type: 'application/json' });
-			const url = URL.createObjectURL(blob);
-			const a = document.createElement('a');
-			a.href = url;
-			a.download = 'coderidian-api-configs.json';
-			a.click();
-			URL.revokeObjectURL(url);
-			new Notice('配置已导出');
-		});
-
-		importBtn.addEventListener('click', () => {
-			const input = document.createElement('input');
-			input.type = 'file';
-			input.accept = '.json';
-			input.onchange = async (e) => {
-				const file = (e.target as HTMLInputElement).files?.[0];
-				if (!file) return;
-				const reader = new FileReader();
-				reader.onload = async (event) => {
-					try {
-						const json = event.target?.result as string;
-						const imported = configManager.importConfigs(json, this.plugin.settings.apiConfigs, 'merge');
-						this.plugin.settings.apiConfigs = imported;
-						await this.plugin.saveSettings();
-						new Notice(`成功导入 ${imported.length} 个配置`);
-						this.display();
-					} catch (err) {
-						new Notice('导入失败: ' + (err as Error).message);
-					}
-				};
-				reader.readAsText(file);
-			};
-			input.click();
-		});
 
 		// HTTP Interceptor settings
 		containerEl.createEl('h2', { text: 'HTTP Interceptor Settings' });

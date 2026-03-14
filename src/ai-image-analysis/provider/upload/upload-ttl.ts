@@ -12,9 +12,7 @@ const execPromise = promisify(exec);
  * ttl.sh 图片上传 Provider
  * 将图片上传到 ttl.sh 获取临时直链
  */
-export class TtlshUploadProvider implements UploadProvider {
-	readonly name = 'ttl.sh';
-
+export class TtlshFUP implements UploadProvider {
 	private config: Required<TtlshProviderConfig>;
 
 	constructor(config?: TtlshProviderConfig) {
@@ -75,7 +73,7 @@ export class TtlshUploadProvider implements UploadProvider {
 			}
 
 			return {
-				id: url,
+				content: url,
 				filename: filename,
 				type: 'url'
 			};
@@ -142,7 +140,7 @@ export async function uploadToTtlsh(
 	fileName: string = `image-${Date.now()}.jpg`,
 	ttl: string = '1h'
 ): Promise<string> {
-	const provider = new TtlshUploadProvider({ ttl });
+	const provider = new TtlshFUP({ ttl });
 	const result = await provider.uploadBuffer(imageBuffer, fileName);
-	return result.id;
+	return result.content;
 }
