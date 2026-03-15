@@ -1,7 +1,6 @@
 import { MarkdownView, Notice, Plugin, addIcon, Editor } from 'obsidian';
 import { MyPluginSettings, DEFAULT_SETTINGS, SampleSettingTab } from './settings';
 import { ApiConfigItem, LlmApiManager } from './config/api-config-manager';
-import { getClaudeCodeConfig } from './config/claude-code-config';
 import { registerCommands } from './commands';
 import { VSCodeService } from './services/vscode';
 import { registerCodeBlockProcessors } from './services/code-blocks';
@@ -15,16 +14,23 @@ import {
 	ToolbarButton
 } from './ai-image-analysis';
 import { createHttpInterceptor, HttpInterceptor } from './interceptors';
+import { AiCompanionManager } from './services/ai-note-compare';
+import { NoteSimilarityService } from './services/note-similarity/note-similarity-service';
+import { SIMILAR_NOTES_VIEW_TYPE, SimilarNotesView } from './views/similar-notes-view';
 
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
 	isBoldMode = true;
 	vscodeService: VSCodeService;
 	private toolbarManager: ImageToolbarManager | null = null;
+	private aiCompanionManager: AiCompanionManager | null = null;
+	noteSimilarityService: NoteSimilarityService | null = null;
 
 	async onload() {
 		await this.loadSettings();
 		this.vscodeService = new VSCodeService(this.app, this.settings);
+		this.registerExtensions(['ai'], 'markdown');
+		this.aiCompanionManager = new AiCompanionManager(this);
 
 		// 初始化全局 LLM API 管理器
 		const activeConfig = this.getActiveApiConfig();
@@ -38,6 +44,16 @@ export default class MyPlugin extends Plugin {
 		this.setupIcons();
 		registerCommands(this);
 		registerCodeBlockProcessors(this);
+
+		// 注册 Note Similarity 侧边栏视图
+		this.registerView(SIMILAR_NOTES_VIEW_TYPE, (leaf) => {
+			return new SimilarNotesView(
+				leaf,
+				this.noteSimilarityService,
+				this.settings.similarNotesLimit,
+				this.settings.embeddingExcludeFolders,
+			);
+		});
 
 		this.addSettingTab(new SampleSettingTab(this.app, this));
 
@@ -67,10 +83,42 @@ export default class MyPlugin extends Plugin {
 			})
 		);
 
-		// 如果当前已有活动视图，立即绑定
-		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-		if (activeView) {
-			await this.toolbarManager?.attachToView(activeView);
+		// layout ready 后：vault 已就绪，再初始化 Note Similarity 和工具栏
+		this.app.workspace.onLayoutReady(async () => {
+			// Note Similarity 必须在 vault ready 后启动，否则 getMarkdownFiles() 返回空列表
+			this.initNoteSimilarity();
+
+			const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+			if (activeView) {
+				await this.toolbarManager?.attachToView(activeView);
+			}
+		});
+
+		// 非关键：注入 Claude Code API 配置（后台异步，不阻塞 onload）
+		this._injectClaudeCodeConfig();
+	}
+
+	private async _injectClaudeCodeConfig(): Promise<void> {
+		const { getClaudeCodeConfig } = await import('./config/claude-code-config');
+		const claudeConfig = await getClaudeCodeConfig(this.app);
+		if (!claudeConfig) return;
+		const exists = this.settings.apiConfigs.some((c) => c.id === 'claude-code');
+		if (!exists) {
+			this.settings.apiConfigs.push({
+				id: 'claude-code',
+				name: 'Claude Code',
+				requestMethod: 'openai',
+				fileUploadMethod: 'requesturl',
+				apiKey: claudeConfig.apiKey,
+				apiEndpoint: claudeConfig.apiEndpoint,
+				fileApiEndpoint: '',
+				model: claudeConfig.model,
+				isPreset: true,
+			});
+			if (!this.settings.activeConfigId) {
+				this.settings.activeConfigId = 'claude-code';
+			}
+			await this.saveSettings();
 		}
 	}
 
@@ -190,6 +238,65 @@ export default class MyPlugin extends Plugin {
 
 	onunload() {
 		this.toolbarManager?.destroy();
+		this.aiCompanionManager?.destroy();
+		this.noteSimilarityService?.destroy();
+		NoteSimilarityService.destroyAllProviders();
+		this.app.workspace.detachLeavesOfType(SIMILAR_NOTES_VIEW_TYPE);
+	}
+
+	/**
+	 * 初始化 Note Similarity 服务（首次加载）
+	 */
+	private initNoteSimilarity(): void {
+		if (!this.settings.embeddingEnabled) return;
+
+		const config = this.settings.embeddingConfigs.find(
+			(c) => c.id === this.settings.activeEmbeddingConfigId,
+		);
+		if (!config) return;
+
+		this.noteSimilarityService = new NoteSimilarityService(this);
+		this.noteSimilarityService.initialize(config, this.settings.embeddingExcludeFolders);
+	}
+
+	/**
+	 * 重新初始化 Note Similarity 服务（设置变更时调用）
+	 */
+	async reinitNoteSimilarity(): Promise<void> {
+		await this.noteSimilarityService?.destroy();
+		this.noteSimilarityService = null;
+
+		// 更新已打开的侧边栏视图
+		this.app.workspace.getLeavesOfType(SIMILAR_NOTES_VIEW_TYPE).forEach((leaf) => {
+			(leaf.view as SimilarNotesView).updateService(null, this.settings.similarNotesLimit);
+		});
+
+		await this.initNoteSimilarity();
+
+		// 把新 service 注入视图
+		this.app.workspace.getLeavesOfType(SIMILAR_NOTES_VIEW_TYPE).forEach((leaf) => {
+			(leaf.view as SimilarNotesView).updateService(
+				this.noteSimilarityService,
+				this.settings.similarNotesLimit,
+				this.settings.embeddingExcludeFolders,
+			);
+		});
+	}
+
+	/**
+	 * 打开 / 聚焦相关笔记侧边栏
+	 */
+	async openSimilarNotesView(): Promise<void> {
+		const existing = this.app.workspace.getLeavesOfType(SIMILAR_NOTES_VIEW_TYPE);
+		if (existing.length > 0) {
+			this.app.workspace.revealLeaf(existing[0]);
+			return;
+		}
+		const leaf = this.app.workspace.getRightLeaf(false);
+		if (leaf) {
+			await leaf.setViewState({ type: SIMILAR_NOTES_VIEW_TYPE, active: true });
+			this.app.workspace.revealLeaf(leaf);
+		}
 	}
 
 	/**
@@ -246,30 +353,51 @@ export default class MyPlugin extends Plugin {
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 
-		// 如果 Claude Code 配置存在，自动添加到 apiConfigs
-		const claudeConfig = await getClaudeCodeConfig(this.app);
-		if (claudeConfig) {
-			// 检查是否已存在
-			const exists = this.settings.apiConfigs.some(c => c.id === 'claude-code');
-			if (!exists) {
-				this.settings.apiConfigs.push({
-					id: 'claude-code',
-					name: 'Claude Code',
-					requestMethod: 'openai',
-					fileUploadMethod: 'requesturl',
-					apiKey: claudeConfig.apiKey,
-					apiEndpoint: claudeConfig.apiEndpoint,
-					fileApiEndpoint: '',
-					model: claudeConfig.model,
-					isPreset: true
+		// 注入本地 Embedding 预设（首次安装时）
+		const LOCAL_PRESETS = [
+			{
+				id: 'local-bge-micro-v2',
+				name: 'BGE-micro-v2 (384d)',
+				model: 'TaylorAI/bge-micro-v2',
+				description: '⚡ 最小最快，~23MB，适合低配设备或快速体验',
+			},
+			{
+				id: 'local-bge-small-en',
+				name: 'BGE-small-en-v1.5 (384d)',
+				model: 'Xenova/bge-small-en-v1.5',
+				description: '📈 同维度质量优于 micro，~34MB，纯英文笔记推荐',
+			},
+			{
+				id: 'local-jina-zh',
+				name: 'Jina-v2-base-zh (768d)',
+				model: 'Xenova/jina-embeddings-v2-base-zh',
+				description: '🇨🇳 中英双语，768维，8192 token，~140MB，中文笔记首选',
+			},
+			{
+				id: 'local-nomic-v1.5',
+				name: 'Nomic-embed-v1.5 (768d)',
+				model: 'nomic-ai/nomic-embed-text-v1.5',
+				description: '🌍 通用多语言，768维，2048 token，~274MB，综合质量最佳',
+			},
+		] as const;
+
+		let needsSave = false;
+		for (const preset of LOCAL_PRESETS) {
+			if (!this.settings.embeddingConfigs.some((c) => c.id === preset.id)) {
+				this.settings.embeddingConfigs.push({
+					...preset,
+					providerType: 'local',
+					isPreset: true,
 				});
-				// 如果没有激活的配置，默认选中 Claude Code
-				if (!this.settings.activeConfigId) {
-					this.settings.activeConfigId = 'claude-code';
-				}
-				await this.saveSettings();
+				needsSave = true;
 			}
 		}
+		if (!this.settings.activeEmbeddingConfigId) {
+			this.settings.activeEmbeddingConfigId = 'local-bge-micro-v2';
+			needsSave = true;
+		}
+		if (needsSave) await this.saveSettings();
+		// Claude Code 配置注入已移至 _injectClaudeCodeConfig()（onload 后台执行，不阻塞）
 	}
 
 	async saveSettings() {

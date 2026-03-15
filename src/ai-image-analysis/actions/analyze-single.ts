@@ -52,10 +52,10 @@ export async function analyzeImageWithUploadResult(
 ): Promise<string> {
 
 	// 提取上下文
-	const context = extractImageContext(parsedNote, imageIndex);
+	// const context = extractImageContext(parsedNote, imageIndex);
 
 	// 构建提示词
-	const systemPrompt = buildEnhancedSingleImagePrompt(parsedNote.content, imageIndex, context)
+	const systemPrompt = buildEnhancedSingleImagePrompt(parsedNote, imageIndex)
 
 	// 构建请求内容
 	const userContent = buildSingleImageUserContent(uploadResult);

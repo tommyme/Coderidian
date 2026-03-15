@@ -7,6 +7,206 @@ If your plugin does not need CSS, delete this file.
 
 */
 
+/* ── Embedding Config Modal ───────────────────────────────────────────────── */
+
+.coderidian-embed-config-modal .modal-content {
+  min-width: 520px;
+}
+
+/* Header row: title + add button side by side */
+.coderidian-embed-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.coderidian-embed-modal-header .coderidian-modal-title {
+  margin: 0;
+}
+
+.coderidian-embed-add-btn {
+  flex-shrink: 0;
+}
+
+/* Scrollable config list */
+.coderidian-config-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-bottom: 4px;
+}
+
+/* Config card */
+.coderidian-config-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: var(--background-primary);
+  transition: border-color 0.15s;
+}
+
+.coderidian-config-row.is-active {
+  border-color: var(--interactive-accent);
+  background: var(--background-secondary);
+}
+
+.coderidian-config-row:hover {
+  border-color: var(--background-modifier-border-hover);
+}
+
+/* Left: name / model / description */
+.coderidian-config-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+  margin-right: 12px;
+}
+
+.coderidian-config-name {
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.coderidian-config-model {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+}
+
+/* Embedding config description */
+.coderidian-config-desc {
+  display: block;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+}
+
+/* Right: action buttons */
+.coderidian-config-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Active badge */
+.coderidian-badge.mod-active {
+  font-size: var(--font-ui-smaller);
+  color: var(--interactive-accent);
+  border: 1px solid var(--interactive-accent);
+  border-radius: var(--radius-s);
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+/* Empty state */
+.coderidian-empty-msg {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 24px 0;
+  font-size: var(--font-ui-small);
+}
+
+/* Floating Translation Panel */
+.coderidian-float-panel {
+  position: fixed;
+  top: 80px;
+  right: 40px;
+  width: 30vw;
+  height: 30vh;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+/* ── Resize handles ──────────────────────────────────────────────────────── */
+.coderidian-float-resizer {
+  position: absolute;
+  z-index: 10;
+}
+
+/* Edges */
+.coderidian-float-resizer-n  { top: 0;    left: 8px;    right: 8px;   height: 5px; cursor: n-resize; }
+.coderidian-float-resizer-s  { bottom: 0; left: 8px;    right: 8px;   height: 5px; cursor: s-resize; }
+.coderidian-float-resizer-e  { right: 0;  top: 8px;     bottom: 8px;  width:  5px; cursor: e-resize; }
+.coderidian-float-resizer-w  { left: 0;   top: 8px;     bottom: 8px;  width:  5px; cursor: w-resize; }
+
+/* Corners */
+.coderidian-float-resizer-ne { top: 0;    right: 0;  width: 10px; height: 10px; cursor: ne-resize; }
+.coderidian-float-resizer-nw { top: 0;    left: 0;   width: 10px; height: 10px; cursor: nw-resize; }
+.coderidian-float-resizer-se { bottom: 0; right: 0;  width: 10px; height: 10px; cursor: se-resize; }
+.coderidian-float-resizer-sw { bottom: 0; left: 0;   width: 10px; height: 10px; cursor: sw-resize; }
+
+.coderidian-float-panel-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--background-secondary);
+  border-bottom: 1px solid var(--background-modifier-border);
+  cursor: grab;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.coderidian-float-panel-titlebar:active {
+  cursor: grabbing;
+}
+
+.coderidian-float-panel-title {
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.coderidian-float-panel-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.coderidian-float-panel-close:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.coderidian-float-panel-body {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;  /* required: lets flexbox shrink below content height */
+  padding: 12px 14px;
+}
+
+.coderidian-float-panel-text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-text);
+  font-size: var(--font-text-size);
+  color: var(--text-normal);
+  user-select: text;
+  cursor: text;
+}
+
 /* inline code 高亮 */
 .cm-inline-code {
   border: 1px #999 solid;
@@ -74,3 +274,219 @@ If your plugin does not need CSS, delete this file.
 /* .tree-item-self.mod-collapsible.is-clickable { */
 /*   flex-direction: row-reverse; */
 /* } */
+
+/* =========================================
+   Related Notes Panel (Note Similarity)
+   ========================================= */
+
+.coderidian-similar-notes-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 0;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+}
+
+/* Header */
+.coderidian-sn-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 6px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  flex-shrink: 0;
+}
+
+.coderidian-sn-title {
+  font-size: var(--font-ui-medium);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.coderidian-sn-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-s);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, color 0.1s;
+}
+
+.coderidian-sn-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* Current note subtitle */
+.coderidian-sn-current-note {
+  padding: 6px 12px 4px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--background-modifier-border);
+  min-height: 22px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.coderidian-sn-current-label {
+  opacity: 0.7;
+}
+
+.coderidian-sn-current-name {
+  font-weight: 500;
+  color: var(--text-accent);
+}
+
+/* Status bar */
+.coderidian-sn-status {
+  padding: 4px 12px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+/* Note list */
+.coderidian-sn-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0 8px;
+}
+
+/* Empty / message */
+.coderidian-sn-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  white-space: pre-line;
+  line-height: 1.6;
+}
+
+/* ── Result item ─────────────────────────────────── */
+
+.coderidian-similar-notes-root .coderidian-sn-item {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  padding: 8px 12px 9px !important;
+  margin-bottom: 2px !important;
+  cursor: pointer !important;
+  border-radius: var(--radius-s) !important;
+  transition: background 80ms ease !important;
+}
+
+.coderidian-similar-notes-root .coderidian-sn-item:hover {
+  background: var(--background-modifier-hover) !important;
+}
+
+/* Title row: score tag · dot · link */
+.coderidian-similar-notes-root .coderidian-sn-title-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  min-width: 0 !important;
+  margin-bottom: 3px !important;
+}
+
+/* Score tag — bordered label */
+.coderidian-similar-notes-root .coderidian-sn-badge {
+  flex-shrink: 0 !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--interactive-accent) !important;
+  border: 1px solid var(--interactive-accent) !important;
+  border-radius: 3px !important;
+  padding: 0 5px !important;
+  line-height: 20px !important;
+  height: 20px !important;
+  letter-spacing: 0.02em !important;
+}
+
+/* Separator dot */
+.coderidian-similar-notes-root .coderidian-sn-bullet {
+  flex-shrink: 0 !important;
+  color: var(--text-faint) !important;
+  font-size: 14px !important;
+  line-height: 1 !important;
+  user-select: none !important;
+}
+
+/* Note title — most prominent */
+.coderidian-similar-notes-root .coderidian-sn-link {
+  flex: 1 !important;
+  min-width: 0 !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  color: var(--text-normal) !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  cursor: pointer !important;
+}
+
+.coderidian-similar-notes-root .coderidian-sn-item:hover .coderidian-sn-link {
+  color: var(--text-accent) !important;
+  text-decoration: underline !important;
+  text-underline-offset: 2px !important;
+}
+
+/* Folder path — small, very muted */
+.coderidian-similar-notes-root .coderidian-sn-path {
+  font-size: 12px !important;
+  color: var(--text-faint) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  margin-bottom: 2px !important;
+  padding-left: 1px !important;
+}
+
+/* Matched chunk excerpt */
+.coderidian-similar-notes-root .coderidian-sn-excerpt {
+  font-size: 12px !important;
+  color: var(--text-muted) !important;
+  font-style: italic !important;
+  line-height: 1.45 !important;
+  padding-left: 1px !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+}
+
+/* Footer */
+.coderidian-sn-footer {
+  padding: 8px 12px;
+  border-top: 1px solid var(--background-modifier-border);
+  flex-shrink: 0;
+}
+
+.coderidian-sn-reindex-btn {
+  width: 100%;
+  padding: 5px 0;
+  background: none;
+  border: none;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  transition: background 80ms, color 80ms;
+}
+
+.coderidian-sn-reindex-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+}
+
+/* Progress notice label */
+.coderidian-progress-label {
+  margin-bottom: 6px;
+  font-size: var(--font-ui-small);
+}

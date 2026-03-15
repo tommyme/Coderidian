@@ -7,31 +7,23 @@ import { LlmApiManager } from "src/config/api-config-manager";
  * 构建单图分析的增强版提示词
  */
 export function buildEnhancedSingleImagePrompt(
-	fullContent: string,
+	parsedNote: ParsedNote,
 	imageIndex: number,
-	context: { beforeText: string; afterText: string }
 ): string {
 	return `# 角色与任务
 你是一个专业的图文内容深度分析专家。请结合文章的完整上下文，对指定的这张图片进行极其详尽的解析。
 
-# 图片位置信息
-- 图片标识：「image-${imageIndex + 1}」
-- 图片前文：
-${context.beforeText}
+# 图片位置信息(具体的图片将放在user content中, 这里是system content)
+- 需要分析的图片标识(其他图片不用分析)：「image-${imageIndex + 1}」
 
-- 图片后文：
-${context.afterText}
 
-# 完整文章内容
-<article_text>
-${fullContent}
-</article_text>
 
-# 深度分析要求（增强版）
+# 深度分析要求
 请对这张图片进行深度解析，包括但不限于：
 
 1. **核心内容识别**
    - 这张图片展示了什么？（截图/图表/照片/插图/代码/架构图等）
+	 - 图盘中文字讲了哪些关键概念
    - 图片中的关键视觉元素有哪些？
 
 2. **上下文关联分析**
@@ -43,6 +35,7 @@ ${fullContent}
    - 图表展示了什么数据趋势？
    - 有什么关键的峰值、谷值或拐点？
    - 能得出什么结论或洞察？
+	 - 如果有文字也要理解
 
 4. **技术解析（如果是技术架构图）**
    - 【一句话总结】这个架构的核心目标
@@ -51,8 +44,14 @@ ${fullContent}
    - 【设计亮点】为什么要这样设计？
 
 5. **信息提取与双链化**
-   - 识别图片中的关键概念、术语、人名、公司名、产品名
+   - 识别图片中的关键文字、概念、术语、人名、公司名、产品名
+	 - 图片中的关键问题要认真理解
    - 将这些关键实体用 [[双链]] 格式标记
+
+# 完整文章内容
+<article_text>
+${parsedNote.contentWithPlaceholders}
+</article_text>
 
 请直接输出你的深度分析内容，不要使用"# image-1"这样的标题。`;
 }

@@ -169,3 +169,124 @@ interface ParsedNote {
 - **阶段**: 一（MVP）
 - **完成时间**: 2026-03-01
 - **下一步**: 用户测试 MVP
+
+---
+
+## 📌 Note Similarity — Chunking & Embedding 策略
+
+### 文件：`src/services/note-similarity/note-similarity-service.ts`
+
+#### 1. 文本清理（`cleanText`）
+
+在分块前去除以下内容：
+- frontmatter（`---...---`）
+- 代码块（` ``` ``` `）
+- 行内代码（`` `...` ``）
+- 图片嵌入（`![[...]]`）
+
+清理后为空 → 跳过该文件（只有纯代码/纯图片笔记才会触发）。
+
+#### 2. 分块策略（`chunkText`）
+
+**参数**
+
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| `CHUNK_MAX` | 500 chars | 中文约 500 token，英文约 125 token，安全上限 |
+| `CHUNK_OVERLAP` | 50 chars | 相邻 chunk 重叠，避免语义在边界断裂 |
+| `CHUNK_MIN` | 80 chars | 过滤切分时产生的碎片（如孤立标题行） |
+
+**三级降级策略**
+
+```
+Level 1：按 H1/H2/H3 标题行切 section（标题保留在 section 开头）
+  → section ≤ CHUNK_MAX 且 ≥ CHUNK_MIN → 直接作为一个 chunk
+
+Level 2：section > CHUNK_MAX → 按段落（双换行）贪心合并
+  → 合并到快超 CHUNK_MAX 时 flush，下一个 chunk 开头保留 50 chars overlap
+
+Level 3：单段落仍 > CHUNK_MAX → 按字符强切，保留 overlap
+
+保底：上述三级均未产生 chunk（笔记很短）→ 直接取全文（不受 CHUNK_MIN 限制）
+  → 短笔记（如原子笔记、医疗记录）同样会被索引，不过滤
+```
+
+#### 3. Embedding 输入构造（`embedFileBatch`）
+
+每个 chunk 在送入 embedding 模型前，前缀拼接文件标题：
+
+```
+{文件名（不含扩展名）}\n\n{chunk 文本}
+```
+
+- 标题提供文档级语义上下文，改善同主题笔记的检索精度
+- chunk body 按需截短：`maxBody = CHUNK_MAX - title.length - 2`，保证总长度 ≤ CHUNK_MAX
+- `preview` 字段仅存原始 chunk 文字（不含标题），用于 UI 显示
+
+#### 4. 写盘策略
+
+- 批量索引（`buildIndexInBackground` / `reindexAll`）：**只在完成、abort、或 batch 报错时 `flush()` 一次**，不在每个 batch 后写盘
+- 实时单文件更新（`embedFile`）：`markDirty()` 防抖写盘（500ms）
+
+---
+
+## 📌 2026-03-12 更新：HTTP 请求拦截器
+
+### 新增功能：请求拦截器模块
+
+#### 新增文件
+- `src/interceptors/http-interceptor.ts` - HTTP 请求拦截器核心实现
+- `src/interceptors/index.ts` - 模块导出
+
+#### 功能特性
+1. **请求拦截器** - 在请求发送前修改请求参数
+2. **响应拦截器** - 在响应返回前处理响应
+3. **错误拦截器** - 统一处理请求错误
+4. **请求日志** - 记录所有 HTTP 请求（方法、URL、状态码、耗时等）
+5. **请求缓存** - GET 请求结果缓存（默认 5 分钟 TTL）
+6. **请求重试** - 自动重试失败的请求（默认 3 次）
+
+#### 测试命令
+- `coderidian:http-interceptor-add-logging` - 添加请求/响应日志拦截器
+- `coderidian:http-interceptor-clear` - 清除所有拦截器
+- `coderidian:http-interceptor-test` - 发送测试请求到 https://httpbin.org
+
+#### 使用方式
+```typescript
+import { HttpInterceptor, createHttpInterceptor } from './interceptors';
+
+// 初始化拦截器
+createHttpInterceptor({
+  enableLogging: true,
+  enableCaching: true,
+  cacheTtl: 5 * 60 * 1000,
+  enableRetry: true,
+  maxRetries: 3
+});
+
+// 添加认证头拦截器
+interceptor.addRequestInterceptor(HttpInterceptor.createAuthInterceptor('your-api-key'));
+
+// 获取请求日志
+const logs = interceptor.getLogs();
+```
+
+#### 状态
+- ✅ 已完成实现
+- ✅ 已集成到插件
+- ⏳ 待用户测试
+
+#### 调试流程
+1. `pnpm dev` - 启动 esbuild watch 模式
+2. `cp main.js ~/repos/content/.obsidian/plugins/coderidian/main.js` - 复制到插件目录
+3. `obsidian reload` - 使用 Obsidian CLI 重载插件
+4. **等待 15 秒** - reload 后需要时间加载所有插件
+5. 打开 DevTools (Ctrl+Shift+I)
+6. 执行命令添加拦截器并测试
+7. 查看 Console 日志
+
+#### 2026-03-12 更新：拦截器执行日志
+在拦截器执行循环中添加了日志输出：
+- `[HttpInterceptor] Request Interceptor - request-logger, response-logger`
+- `[HttpInterceptor] Response Interceptor - request-logger, response-logger`
+- `[HttpInterceptor] Error Interceptor - xxx`
