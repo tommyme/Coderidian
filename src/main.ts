@@ -88,6 +88,15 @@ export default class MyPlugin extends Plugin {
 			// Note Similarity 必须在 vault ready 后启动，否则 getMarkdownFiles() 返回空列表
 			this.initNoteSimilarity();
 
+			// 把刚创建的 service 注入到已从 layout 恢复的侧边栏（否则显示 "not configured"）
+			this.app.workspace.getLeavesOfType(SIMILAR_NOTES_VIEW_TYPE).forEach((leaf) => {
+				(leaf.view as SimilarNotesView).updateService(
+					this.noteSimilarityService,
+					this.settings.similarNotesLimit,
+					this.settings.embeddingExcludeFolders,
+				);
+			});
+
 			const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
 			if (activeView) {
 				await this.toolbarManager?.attachToView(activeView);
