@@ -14,7 +14,6 @@ import {
 	ToolbarButton
 } from './ai-image-analysis';
 import { createHttpInterceptor, HttpInterceptor } from './interceptors';
-import { AiCompanionManager } from './services/ai-note-compare';
 import { NoteSimilarityService } from './services/note-similarity/note-similarity-service';
 import { SIMILAR_NOTES_VIEW_TYPE, SimilarNotesView } from './views/similar-notes-view';
 
@@ -23,14 +22,12 @@ export default class MyPlugin extends Plugin {
 	isBoldMode = true;
 	vscodeService: VSCodeService;
 	private toolbarManager: ImageToolbarManager | null = null;
-	private aiCompanionManager: AiCompanionManager | null = null;
 	noteSimilarityService: NoteSimilarityService | null = null;
 
 	async onload() {
 		await this.loadSettings();
 		this.vscodeService = new VSCodeService(this.app, this.settings);
 		this.registerExtensions(['ai'], 'markdown');
-		this.aiCompanionManager = new AiCompanionManager(this);
 
 		// 初始化全局 LLM API 管理器
 		const activeConfig = this.getActiveApiConfig();
@@ -247,7 +244,6 @@ export default class MyPlugin extends Plugin {
 
 	onunload() {
 		this.toolbarManager?.destroy();
-		this.aiCompanionManager?.destroy();
 		this.noteSimilarityService?.destroy();
 		NoteSimilarityService.destroyAllProviders();
 		this.app.workspace.detachLeavesOfType(SIMILAR_NOTES_VIEW_TYPE);
@@ -280,7 +276,7 @@ export default class MyPlugin extends Plugin {
 			(leaf.view as SimilarNotesView).updateService(null, this.settings.similarNotesLimit);
 		});
 
-		await this.initNoteSimilarity();
+		this.initNoteSimilarity();
 
 		// 把新 service 注入视图
 		this.app.workspace.getLeavesOfType(SIMILAR_NOTES_VIEW_TYPE).forEach((leaf) => {
@@ -346,7 +342,7 @@ export default class MyPlugin extends Plugin {
 		}
 
 		this.addRibbonIcon('dice', 'Quick switcher', () => {
-			this.app.commands.executeCommandById('switcher:open');
+			(this.app as unknown as { commands: { executeCommandById: (id: string) => void } }).commands.executeCommandById('switcher:open');
 		}).addClass('my-plugin-ribbon-class');
 
 		this.addRibbonIcon('switch', 'Toggle mode (bold/sidebar)', () => {

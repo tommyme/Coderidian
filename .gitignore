@@ -22,3 +22,9 @@ data.json
 .DS_Store
 
 coderidian
+
+# Claude Code
+.claude/
+
+# Excalidraw diagram files
+docs/architecture/*.excalidraw

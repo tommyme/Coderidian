@@ -1,5 +1,5 @@
 import { Plugin, TFile, TAbstractFile, Notice } from 'obsidian';
-import { EmbeddingConfigItem, EmbeddingStore, NoteChunk, SimilarNote } from './types';
+import { EmbeddingConfigItem, NoteChunk, SimilarNote } from './types';
 import { createEmbeddingProvider, EmbeddingProvider, LocalEmbeddingProvider } from './embed-provider';
 import { findTopK } from './similarity-engine';
 import { loadStore, DebouncedStorage } from './storage';
@@ -117,8 +117,6 @@ export class NoteSimilarityService {
 	private isIndexing = false;
 	private isLoading = false; // 正在从磁盘恢复已有索引（短暂，100–800ms）
 	private aborted = false;   // destroy() 后设为 true，让后台循环提前退出
-	private queue: TFile[] = [];
-	private queueTimer: ReturnType<typeof setTimeout> | null = null;
 
 	// 外部订阅，用于更新侧边栏 UI
 	onProgressChange?: IndexProgressCallback;
@@ -171,12 +169,6 @@ export class NoteSimilarityService {
 
 	private _registerVaultEvents(): void {
 		this.vaultEventRefs = [
-			this.plugin.app.vault.on('modify', (file) => {
-				if (file instanceof TFile && file.extension === 'md') this.enqueue(file);
-			}),
-			this.plugin.app.vault.on('create', (file) => {
-				if (file instanceof TFile && file.extension === 'md') this.enqueue(file);
-			}),
 			this.plugin.app.vault.on('delete', (file: TAbstractFile) => {
 				if (file instanceof TFile && file.extension === 'md') {
 					delete this.storage.getStore().notes[file.path];
@@ -388,27 +380,12 @@ export class NoteSimilarityService {
 		this.storage.setDirty();
 	}
 
-	/** 单文件 embed（用于实时队列） */
-	private async embedFile(file: TFile): Promise<void> {
+	/** 单文件 embed：检查哈希，有变化才重新 embed，完成后防抖写盘。
+	 * 供外部（view 的 open/leave 触发）调用，幂等，可安全并发。
+	 */
+	async embedFileIfChanged(file: TFile): Promise<void> {
 		await this.embedFileBatch([file]);
-		this.storage.markDirty(); // 实时更新需要防抖写盘
-	}
-
-	private enqueue(file: TFile): void {
-		if (!this.queue.includes(file)) this.queue.push(file);
-		// 真正的 debounce：停止编辑 2s 后才触发，避免频繁打字时 API 调用过多
-		if (this.queueTimer) clearTimeout(this.queueTimer);
-		this.queueTimer = setTimeout(async () => {
-			this.queueTimer = null;
-			const batch = this.queue.splice(0);
-			for (const f of batch) {
-				try {
-					await this.embedFile(f);
-				} catch (e) {
-					console.warn(`[NoteSimilarity] Failed to embed ${f.path}:`, e);
-				}
-			}
-		}, 2000);
+		this.storage.markDirty();
 	}
 
 	private setReady(ready: boolean): void {
@@ -424,13 +401,15 @@ export class NoteSimilarityService {
 		if (!entry?.chunks?.length) {
 			// 尝试现场 embed
 			try {
-				await this.embedFile(file);
+				await this.embedFileIfChanged(file);
 			} catch {
 				return [];
 			}
 		}
 		const queryVecs = this.storage.getStore().notes[file.path]?.chunks?.map((c) => c.vec) ?? [];
 		if (queryVecs.length === 0) return [];
+		// 让出主线程，避免阻塞 UI（findTopK 是同步计算，推迟到浏览器渲染之后执行）
+		await new Promise<void>((resolve) => setTimeout(resolve, 0));
 		return findTopK(store, queryVecs, limit, file.path);
 	}
 
@@ -550,10 +529,6 @@ export class NoteSimilarityService {
 		this.vaultEventRefs = [];
 		this.activeProgressNotice?.hide();
 		this.activeProgressNotice = null;
-		if (this.queueTimer) {
-			clearTimeout(this.queueTimer);
-			this.queueTimer = null;
-		}
 		this.provider?.destroy?.();
 		// 强制写盘：把内存里已有的数据保存下来。
 		// 不能只依赖后台循环的 setDirty()，因为 loadStore() 在后台循环

@@ -73,22 +73,42 @@ export class SimilarNotesView extends ItemView {
 		// 监听 service 状态变化
 		this.wireService(this.service);
 
-		// 监听当前活动文件变化 — 只在切换到 MarkdownView 时更新 lastFile
+		// 监听当前活动文件变化
 		this.registerEvent(
 			this.app.workspace.on('active-leaf-change', (leaf) => {
 				const view = leaf?.view;
 				if (view instanceof MarkdownView && view.file) {
-					this.lastFile = view.file;
+					const prevFile = this.lastFile;
+					const newFile = view.file;
+
+					// 切离时：后台静默 embed 上一篇（fire-and-forget，不影响当前操作）
+					if (prevFile && prevFile !== newFile && this.service) {
+						this.service.embedFileIfChanged(prevFile).catch(() => {});
+					}
+
+					this.lastFile = newFile;
+
+					// 先用缓存立即刷新，再后台确保当前文件向量最新，完成后再刷新一次
 					this.refresh();
+					if (this.service) {
+						this.service.embedFileIfChanged(newFile)
+							.then(() => this.refresh())
+							.catch(() => {});
+					}
 				}
-				// If a non-MarkdownView (e.g. this panel) becomes active, keep lastFile as-is
+				// 切到非 MarkdownView（如本面板）时保留 lastFile
 			}),
 		);
 
-		// Seed lastFile from currently active MarkdownView
+		// Seed lastFile from currently active MarkdownView，并确保其向量是最新的
 		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
 		if (activeView?.file) {
 			this.lastFile = activeView.file;
+			if (this.service) {
+				this.service.embedFileIfChanged(activeView.file)
+					.then(() => this.refresh())
+					.catch(() => {});
+			}
 		}
 
 		await this.refresh();
@@ -211,7 +231,7 @@ export class SimilarNotesView extends ItemView {
 			item.addEventListener('click', () => {
 				const f = this.app.vault.getAbstractFileByPath(result.path);
 				if (f instanceof TFile) {
-					this.app.workspace.getLeaf(false).openFile(f);
+					this.app.workspace.getLeaf('tab').openFile(f);
 				}
 			});
 		}
