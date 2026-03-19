@@ -9,7 +9,9 @@ if you want to view the source, please visit the github repository of this plugi
 */
 `;
 
-const prod = (process.argv[2] === "production");
+const arg = process.argv[2];
+const prod = (arg === "production");
+const once = (arg === "once");
 
 const context = await esbuild.context({
 	banner: {
@@ -37,10 +39,10 @@ const context = await esbuild.context({
 	logLevel: "info",
 	sourcemap: prod ? false : "inline",
 	treeShaking: true,
-	outfile: "main.js",
+	outfile: once ? "dist/main.js" : "main.js",
 });
 
-if (prod) {
+if (prod || once) {
 	await context.rebuild();
 	process.exit(0);
 } else {

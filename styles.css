@@ -490,3 +490,12 @@ If your plugin does not need CSS, delete this file.
   margin-bottom: 6px;
   font-size: var(--font-ui-small);
 }
+
+/* Heading level adjust dialog */
+.coderidian-heading-delta {
+  font-size: 3em;
+  font-weight: bold;
+  text-align: center;
+  padding: 16px 0;
+  min-width: 120px;
+}

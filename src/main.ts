@@ -1,4 +1,4 @@
-import { MarkdownView, Notice, Plugin, addIcon, Editor } from 'obsidian';
+import { MarkdownView, Notice, Plugin, addIcon, Editor, TFile } from 'obsidian';
 import { MyPluginSettings, DEFAULT_SETTINGS, SampleSettingTab } from './settings';
 import { ApiConfigItem, LlmApiManager } from './config/api-config-manager';
 import { registerCommands } from './commands';
@@ -286,6 +286,28 @@ export default class MyPlugin extends Plugin {
 				this.settings.embeddingExcludeFolders,
 			);
 		});
+	}
+
+	/**
+	 * 公开 API：查找与指定文件最相似的笔记
+	 *
+	 * @param filePath  笔记的 vault 相对路径，如 "MyNotes/ideas.md"
+	 * @param limit     返回数量，默认 10
+	 * @returns         相关笔记列表，含 path、score、matchedChunk
+	 *
+	 * 用法示例（其他插件 / CLI）：
+	 *   const results = await app.plugins.plugins.coderidian
+	 *     .findSimilarNotes("MyNotes/ideas.md", 10);
+	 */
+	async findSimilarNotes(filePath: string, limit = 10): Promise<import('./services/note-similarity/types').SimilarNote[]> {
+		if (!this.noteSimilarityService) {
+			throw new Error('Note Similarity is not enabled. Enable it in Settings first.');
+		}
+		const file = this.app.vault.getAbstractFileByPath(filePath);
+		if (!file || !(file instanceof TFile) || file.extension !== 'md') {
+			throw new Error(`Invalid file path: ${filePath}`);
+		}
+		return this.noteSimilarityService.findSimilar(file, limit);
 	}
 
 	/**

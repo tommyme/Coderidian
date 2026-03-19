@@ -4,6 +4,7 @@ import { processCurrentNote } from './ai-image-analysis';
 import { ConfirmModal, zipVault } from './utils';
 import { existsSync } from 'fs';
 import { openSectionTranslationModal } from './views/section-translation-modal';
+import { HeadingLevelModal } from './views/heading-level-modal';
 
 /**
  * Wrap selected content with HTML tags
@@ -101,6 +102,14 @@ export function registerCommands(plugin: MyPlugin) {
 	}
 
 	plugin.addCommand({
+		id: 'adjust-heading-level',
+		name: '[Editor] Adjust Heading Level',
+		editorCallback: (editor) => {
+			new HeadingLevelModal(plugin.app, editor).open();
+		},
+	});
+
+	plugin.addCommand({
 		id: 'copy-selected-lf-content',
 		name: '[Editor] Copy Selection with CRLF',
 		async editorCallback(editor, ctx) {
@@ -189,6 +198,37 @@ export function registerCommands(plugin: MyPlugin) {
 			await plugin.noteSimilarityService.reindexAll(
 				plugin.settings.embeddingExcludeFolders,
 			);
+		},
+	});
+
+	plugin.addCommand({
+		id: 'find-similar-notes',
+		name: '[Similarity] Find Similar Notes',
+		callback: async () => {
+			if (!plugin.noteSimilarityService) {
+				new Notice('Note Similarity is not enabled. Enable it in Settings first.');
+				return;
+			}
+			const activeFile = plugin.app.workspace.getActiveFile();
+			if (!activeFile) {
+				new Notice('No active file.');
+				return;
+			}
+			const notice = new Notice('正在查找…', 0);
+			try {
+				const results = await plugin.noteSimilarityService.findSimilar(activeFile, plugin.settings.similarNotesLimit);
+				notice.hide();
+				console.log('[find-similar-notes]', results);
+				new Notice(
+					results.length > 0
+						? `✅ 找到 ${results.length} 条相关笔记`
+						: '🔍 未找到相关笔记',
+					3000,
+				);
+			} catch (e) {
+				notice.hide();
+				new Notice(`❌ 失败：${e instanceof Error ? e.message : String(e)}`);
+			}
 		},
 	});
 

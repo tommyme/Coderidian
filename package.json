@@ -5,6 +5,8 @@
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
+		"compile": "node esbuild.config.mjs once",
+		"test": "cp dist/* ~/repos/content/.obsidian/plugins/coderidian/; obsidian reload",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
 		"packer": "mkdir -p Coderidian && cp main.js manifest.json styles.css Coderidian"
