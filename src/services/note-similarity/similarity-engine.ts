@@ -39,8 +39,8 @@ export function findTopK(
 	if (queryVecs.length === 0) return [];
 	const dims = queryVecs[0].length;
 
-	// path → { score, matchedChunk }
-	const best = new Map<string, { score: number; matchedChunk: string }>();
+	// path → { score, matchedChunk, matchedHeading }
+	const best = new Map<string, { score: number; matchedChunk: string; matchedHeading?: string }>();
 
 	for (const [path, embedding] of Object.entries(store.notes)) {
 		if (path === excludePath) continue;
@@ -52,14 +52,14 @@ export function findTopK(
 				const score = cosSim(qVec, chunk.vec);
 				const current = best.get(path);
 				if (!current || score > current.score) {
-					best.set(path, { score, matchedChunk: chunk.preview });
+					best.set(path, { score, matchedChunk: chunk.preview, matchedHeading: chunk.heading });
 				}
 			}
 		}
 	}
 
 	return Array.from(best.entries())
-		.map(([path, { score, matchedChunk }]) => ({ path, score, matchedChunk }))
+		.map(([path, { score, matchedChunk, matchedHeading }]) => ({ path, score, matchedChunk, matchedHeading }))
 		.sort((a, b) => b.score - a.score)
 		.slice(0, k);
 }

@@ -2,6 +2,8 @@ export interface NoteChunk {
 	vec: number[];
 	/** chunk 文字前 80 字符，用于 UI 显示匹配片段 */
 	preview: string;
+	/** chunk 所属的标题文字（H1/H2/H3），用于点击后跳转定位 */
+	heading?: string;
 }
 
 export interface NoteEmbedding {
@@ -20,6 +22,8 @@ export interface SimilarNote {
 	score: number; // 0-1 cosine similarity
 	/** 最匹配 chunk 的文字片段，用于 UI 显示"为什么相关" */
 	matchedChunk?: string;
+	/** 最匹配 chunk 所属的标题，用于点击后跳转到对应 section */
+	matchedHeading?: string;
 }
 
 export interface EmbeddingConfigItem {

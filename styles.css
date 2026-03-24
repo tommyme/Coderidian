@@ -499,3 +499,37 @@ If your plugin does not need CSS, delete this file.
   padding: 16px 0;
   min-width: 120px;
 }
+
+/* ── Mermaid (beautiful-mermaid) ─────────────────────────────────────────── */
+
+.coderidian-mermaid {
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+}
+
+.coderidian-mermaid svg {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+
+.coderidian-mermaid-error pre {
+  color: var(--text-error);
+  font-size: 0.85em;
+  padding: 8px;
+  background: var(--background-modifier-error);
+  border-radius: 4px;
+  white-space: pre-wrap;
+}
+
+.coderidian-mermaid-ascii {
+  font-family: var(--font-monospace);
+  font-size: 0.85em;
+  line-height: 1.4;
+  overflow-x: auto;
+  white-space: pre;
+  background: var(--background-secondary);
+  padding: 12px 16px;
+  border-radius: 6px;
+}

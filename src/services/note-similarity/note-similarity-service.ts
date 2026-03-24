@@ -39,16 +39,16 @@ function cleanText(content: string): string {
  *   Level 2：section 过长 → 按段落（双换行）贪心合并，超出则 flush + overlap
  *   Level 3：单段落仍过长 → 按字符强切，保留 overlap
  */
-export function chunkText(text: string): string[] {
+export function chunkText(text: string): { text: string; heading?: string }[] {
 	// ── Level 1: 按标题切 section ──────────────────────────────────────────
 	const lines = text.split('\n');
-	const sections: string[] = [];
+	const sections: { content: string; heading?: string }[] = [];
 	let current: string[] = [];
 
 	for (const line of lines) {
 		if (/^#{1,3} /.test(line) && current.length > 0) {
 			const s = current.join('\n').trim();
-			if (s) sections.push(s);
+			if (s) sections.push({ content: s, heading: s.match(/^#{1,3} (.+)/m)?.[1]?.trim() });
 			current = [line];
 		} else {
 			current.push(line);
@@ -56,17 +56,17 @@ export function chunkText(text: string): string[] {
 	}
 	if (current.length > 0) {
 		const s = current.join('\n').trim();
-		if (s) sections.push(s);
+		if (s) sections.push({ content: s, heading: s.match(/^#{1,3} (.+)/m)?.[1]?.trim() });
 	}
 
 	// ── Level 2 & 3: 每个 section 按段落 / 字符进一步切分 ──────────────────
-	const chunks: string[] = [];
+	const chunks: { text: string; heading?: string }[] = [];
 
-	for (const section of sections) {
+	for (const { content: section, heading } of sections) {
 		if (!section) continue;
 
 		if (section.length <= CHUNK_MAX) {
-			if (section.length >= CHUNK_MIN) chunks.push(section);
+			if (section.length >= CHUNK_MIN) chunks.push({ text: section, heading });
 			continue;
 		}
 
@@ -81,7 +81,7 @@ export function chunkText(text: string): string[] {
 				buf += separator + para;
 			} else {
 				// flush 当前 buf
-				if (buf.length >= CHUNK_MIN) chunks.push(buf);
+				if (buf.length >= CHUNK_MIN) chunks.push({ text: buf, heading });
 
 				// 下一个 buf 以 overlap 开头
 				const overlap = buf.slice(-CHUNK_OVERLAP);
@@ -90,17 +90,17 @@ export function chunkText(text: string): string[] {
 				// Level 3：单段落（含 overlap）仍超长 → 字符强切
 				while (buf.length > CHUNK_MAX) {
 					const slice = buf.slice(0, CHUNK_MAX);
-					if (slice.length >= CHUNK_MIN) chunks.push(slice);
+					if (slice.length >= CHUNK_MIN) chunks.push({ text: slice, heading });
 					buf = buf.slice(CHUNK_MAX - CHUNK_OVERLAP);
 				}
 			}
 		}
-		if (buf.length >= CHUNK_MIN) chunks.push(buf);
+		if (buf.length >= CHUNK_MIN) chunks.push({ text: buf, heading });
 	}
 
 	// 保底：如果什么都没切出来（如整篇笔记很短），直接取全文，不受 CHUNK_MIN 限制
 	if (chunks.length === 0 && text.length > 0) {
-		chunks.push(text.slice(0, CHUNK_MAX));
+		chunks.push({ text: text.slice(0, CHUNK_MAX) });
 	}
 
 	return chunks;
@@ -316,7 +316,7 @@ export class NoteSimilarityService {
 		const fileItems: Array<{
 			file: TFile;
 			hash: string;
-			chunks: Array<{ text: string; preview: string }>;
+			chunks: Array<{ text: string; preview: string; heading?: string }>;
 		}> = [];
 
 		for (const file of files) {
@@ -331,8 +331,8 @@ export class NoteSimilarityService {
 				continue;
 			}
 
-			const chunkTexts = chunkText(raw);
-			if (chunkTexts.length === 0) {
+			const chunkItems = chunkText(raw);
+			if (chunkItems.length === 0) {
 				this.storage.getStore().notes[file.path] = { chunks: [], hash, updatedAt: Date.now() };
 				continue;
 			}
@@ -340,7 +340,7 @@ export class NoteSimilarityService {
 			fileItems.push({
 				file,
 				hash,
-				chunks: chunkTexts.map((t) => ({ text: t, preview: t.slice(0, 80) })),
+				chunks: chunkItems.map((c) => ({ text: c.text, preview: c.text.slice(0, 80), heading: c.heading })),
 			});
 		}
 
@@ -369,6 +369,7 @@ export class NoteSimilarityService {
 			const noteChunks: NoteChunk[] = item.chunks.map((chunk) => ({
 				vec: allVecs[vecIdx++],
 				preview: chunk.preview,
+				heading: chunk.heading,
 			}));
 			store.notes[item.file.path] = {
 				chunks: noteChunks,
@@ -494,7 +495,8 @@ export class NoteSimilarityService {
 		const raw = cleanText(content);
 		if (!raw) throw new Error('无法从文件中提取文本内容');
 
-		const chunkTexts = chunkText(raw);
+		const chunkItems = chunkText(raw);
+		const chunkTexts = chunkItems.map((c) => c.text);
 		const t0 = Date.now();
 		const vecs = await this.provider.embedBatch(chunkTexts);
 		const durationMs = Date.now() - t0;

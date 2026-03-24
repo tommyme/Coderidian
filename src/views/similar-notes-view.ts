@@ -229,10 +229,13 @@ export class SimilarNotesView extends ItemView {
 			}
 
 			item.addEventListener('click', () => {
-				const f = this.app.vault.getAbstractFileByPath(result.path);
-				if (f instanceof TFile) {
-					this.app.workspace.getLeaf('tab').openFile(f);
-				}
+				const notePath = result.path.replace(/\.md$/, '');
+				const linktext = result.matchedHeading
+					? `${notePath}#${result.matchedHeading}`
+					: notePath;
+				// openLinkText handles heading anchors natively and is more
+				// reliable than eState.subpath; 'tab' opens in a new tab
+				this.app.workspace.openLinkText(linktext, '', 'tab' as any);
 			});
 		}
 	}
