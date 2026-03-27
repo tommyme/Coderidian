@@ -3,6 +3,8 @@ import MyPlugin from './main';
 import { ApiConfigItem, ApiConfigManager, LlmApiManager } from './config/api-config-manager';
 import { ConfigModal } from './utils';
 import { EmbeddingConfigItem } from './services/note-similarity/types';
+import { TerminalSettings, TerminalOpenPosition, DEFAULT_TERMINAL_SETTINGS } from './terminal';
+// TerminalSettings no longer has 'enabled' field — terminal is always on
 
 export interface MyPluginSettings {
 	mySetting: string;
@@ -24,6 +26,8 @@ export interface MyPluginSettings {
 	activeEmbeddingConfigId: string;
 	similarNotesLimit: number;
 	embeddingExcludeFolders: string[];
+	// Terminal settings
+	terminal: TerminalSettings;
 }
 
 export const DEFAULT_SETTINGS: MyPluginSettings = {
@@ -46,6 +50,8 @@ export const DEFAULT_SETTINGS: MyPluginSettings = {
 	activeEmbeddingConfigId: '',
 	similarNotesLimit: 10,
 	embeddingExcludeFolders: [],
+	// Terminal default settings
+	terminal: DEFAULT_TERMINAL_SETTINGS,
 };
 
 export class SampleSettingTab extends PluginSettingTab {
@@ -231,6 +237,108 @@ export class SampleSettingTab extends PluginSettingTab {
 						}),
 				);
 		}
+
+		this.renderTerminalSettings(containerEl);
+	}
+
+	private renderTerminalSettings(containerEl: HTMLElement): void {
+		containerEl.createEl('h2', { text: 'Terminal Settings' });
+
+		new Setting(containerEl)
+			.setName('Default open position')
+			.setDesc('Where to open new terminal panes')
+			.addDropdown((dd) => dd
+				.addOption('bottom', 'Bottom split (VSCode-style)')
+				.addOption('right',  'Right sidebar')
+				.addOption('tab',    'New tab')
+				.addOption('window', 'Floating window')
+				.setValue(this.plugin.settings.terminal.defaultPosition)
+				.onChange(async (v) => {
+					this.plugin.settings.terminal.defaultPosition = v as TerminalOpenPosition;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Shell path')
+			.setDesc('Absolute path to shell binary. Leave blank to use $SHELL or /bin/zsh')
+			.addText((t) => t.setPlaceholder('/bin/zsh')
+				.setValue(this.plugin.settings.terminal.shellPath)
+				.onChange(async (v) => {
+					this.plugin.settings.terminal.shellPath = v.trim();
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Shell arguments')
+			.setDesc('Space-separated extra arguments for the shell (e.g. --login)')
+			.addText((t) => t.setPlaceholder('--login')
+				.setValue(this.plugin.settings.terminal.shellArgs.join(' '))
+				.onChange(async (v) => {
+					this.plugin.settings.terminal.shellArgs = v.split(/\s+/).filter(Boolean);
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Ghostty config path')
+			.setDesc('Path to Ghostty config file. Leave blank to auto-detect (~/.config/ghostty/config)')
+			.addText((t) => t.setPlaceholder('~/.config/ghostty/config')
+				.setValue(this.plugin.settings.terminal.ghosttyConfigPath)
+				.onChange(async (v) => {
+					this.plugin.settings.terminal.ghosttyConfigPath = v.trim();
+					await this.plugin.saveSettings();
+					this.plugin.terminalService?.reloadGhosttyConfig();
+				}));
+
+		new Setting(containerEl)
+			.setName('Font family override')
+			.setDesc('Leave blank to use value from Ghostty config')
+			.addText((t) => t.setPlaceholder('JetBrains Mono, Menlo')
+				.setValue(this.plugin.settings.terminal.fontFamilyOverride)
+				.onChange(async (v) => {
+					this.plugin.settings.terminal.fontFamilyOverride = v.trim();
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Font size override')
+			.setDesc('Set to 0 to use value from Ghostty config')
+			.addText((t) => t.setPlaceholder('13')
+				.setValue(this.plugin.settings.terminal.fontSizeOverride > 0
+					? String(this.plugin.settings.terminal.fontSizeOverride) : '')
+				.onChange(async (v) => {
+					this.plugin.settings.terminal.fontSizeOverride = parseFloat(v) || 0;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Scrollback lines')
+			.setDesc('Number of lines to keep in the scrollback buffer')
+			.addText((t) => t.setPlaceholder('10000')
+				.setValue(String(this.plugin.settings.terminal.scrollbackLines))
+				.onChange(async (v) => {
+					this.plugin.settings.terminal.scrollbackLines = parseInt(v, 10) || 10000;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Pass to Obsidian keys')
+			.setDesc('Comma-separated key combos to forward to Obsidian (not sent to terminal). E.g. mod+p, mod+o')
+			.addText((t) => t.setPlaceholder('mod+p, mod+o')
+				.setValue(this.plugin.settings.terminal.passToObsidian.join(', '))
+				.onChange(async (v) => {
+					this.plugin.settings.terminal.passToObsidian = v.split(',').map(s => s.trim()).filter(Boolean);
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Block from Obsidian keys')
+			.setDesc('Comma-separated key combos to swallow entirely (not forwarded to Obsidian or terminal). Mod+W is always blocked.')
+			.addText((t) => t.setPlaceholder('mod+shift+w')
+				.setValue(this.plugin.settings.terminal.blockFromObsidian.join(', '))
+				.onChange(async (v) => {
+					this.plugin.settings.terminal.blockFromObsidian = v.split(',').map(s => s.trim()).filter(Boolean);
+					await this.plugin.saveSettings();
+				}));
 	}
 
 	private openEmbeddingConfigModal(): void {

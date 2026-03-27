@@ -1,4 +1,4 @@
-import { Editor, MarkdownView, Notice } from 'obsidian';
+import { Editor, MarkdownView, Notice, Platform } from 'obsidian';
 import MyPlugin from './main';
 import { processCurrentNote } from './ai-image-analysis';
 import { ConfirmModal, zipVault } from './utils';
@@ -281,5 +281,38 @@ export function registerCommands(plugin: MyPlugin) {
 				console.error('[Test] Error:', err);
 			}
 		}
+	});
+
+	// [Terminal] commands
+	const terminalNotReady = () => new Notice('Terminal is initializing, please try again in a moment.', 3000);
+
+	plugin.addCommand({
+		id: 'terminal-open',
+		name: '[Terminal] Open terminal',
+		callback: () => plugin.terminalService ? plugin.terminalService.openTerminal() : terminalNotReady(),
+	});
+
+	plugin.addCommand({
+		id: 'terminal-open-bottom',
+		name: '[Terminal] Open terminal — Bottom split',
+		callback: () => plugin.terminalService ? plugin.terminalService.openTerminal('bottom', true) : terminalNotReady(),
+	});
+
+	plugin.addCommand({
+		id: 'terminal-open-right',
+		name: '[Terminal] Open terminal — Right sidebar',
+		callback: () => plugin.terminalService ? plugin.terminalService.openTerminal('right', true) : terminalNotReady(),
+	});
+
+	plugin.addCommand({
+		id: 'terminal-open-tab',
+		name: '[Terminal] Open terminal — New tab',
+		callback: () => plugin.terminalService ? plugin.terminalService.openTerminal('tab', true) : terminalNotReady(),
+	});
+
+	plugin.addCommand({
+		id: 'terminal-open-window',
+		name: '[Terminal] Open terminal — Floating window',
+		callback: () => plugin.terminalService ? plugin.terminalService.openTerminal('window', true) : terminalNotReady(),
 	});
 }

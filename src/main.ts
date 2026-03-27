@@ -16,6 +16,7 @@ import {
 import { createHttpInterceptor, HttpInterceptor } from './interceptors';
 import { NoteSimilarityService } from './services/note-similarity/note-similarity-service';
 import { SIMILAR_NOTES_VIEW_TYPE, SimilarNotesView } from './views/similar-notes-view';
+import { TerminalService, TERMINAL_VIEW_TYPE } from './terminal';
 
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
@@ -23,6 +24,7 @@ export default class MyPlugin extends Plugin {
 	vscodeService: VSCodeService;
 	private toolbarManager: ImageToolbarManager | null = null;
 	noteSimilarityService: NoteSimilarityService | null = null;
+	terminalService: TerminalService | null = null;
 
 	async onload() {
 		await this.loadSettings();
@@ -82,6 +84,9 @@ export default class MyPlugin extends Plugin {
 
 		// layout ready 后：vault 已就绪，再初始化 Note Similarity 和工具栏
 		this.app.workspace.onLayoutReady(async () => {
+			// 初始化 Terminal 服务（WASM + Ghostty config）
+			await this.initTerminalService();
+
 			// Note Similarity 必须在 vault ready 后启动，否则 getMarkdownFiles() 返回空列表
 			this.initNoteSimilarity();
 
@@ -247,6 +252,29 @@ export default class MyPlugin extends Plugin {
 		this.noteSimilarityService?.destroy();
 		NoteSimilarityService.destroyAllProviders();
 		this.app.workspace.detachLeavesOfType(SIMILAR_NOTES_VIEW_TYPE);
+		this.terminalService?.destroy();
+	}
+
+	/**
+	 * 初始化 Terminal 服务
+	 */
+	private async initTerminalService(): Promise<void> {
+		// Resolve absolute plugin directory path for pty_helper.py placement
+		const adapter = this.app.vault.adapter as unknown as {
+			getBasePath?: () => string;
+		};
+		const vaultRoot = adapter.getBasePath?.() ?? require('os').homedir();
+		const pluginDir = this.manifest.dir
+			? require('path').join(vaultRoot, this.manifest.dir)
+			: __dirname;
+
+		this.terminalService = new TerminalService(
+			this.app,
+			this.settings.terminal,
+			pluginDir,
+			(type, factory) => this.registerView(type, factory),
+		);
+		await this.terminalService.initialize();
 	}
 
 	/**
@@ -299,6 +327,20 @@ export default class MyPlugin extends Plugin {
 	 *   const results = await app.plugins.plugins.coderidian
 	 *     .findSimilarNotes("MyNotes/ideas.md", 10);
 	 */
+	/**
+	 * 公开 API：向终端发送文本
+	 *
+	 * @param text    要发送的文本
+	 * @param newline 是否追加换行符（true = 发送后自动执行命令）
+	 * @returns       true = 发送成功；false = 当前无打开的终端
+	 *
+	 * 用法示例：
+	 *   app.plugins.plugins.coderidian.sendTextToTerminal('ls -la', true);
+	 */
+	public sendTextToTerminal(text: string, newline = false): boolean {
+		return this.terminalService?.sendText(text, newline) ?? false;
+	}
+
 	async findSimilarNotes(filePath: string, limit = 10): Promise<import('./services/note-similarity/types').SimilarNote[]> {
 		if (!this.noteSimilarityService) {
 			throw new Error('Note Similarity is not enabled. Enable it in Settings first.');
@@ -379,6 +421,10 @@ export default class MyPlugin extends Plugin {
 
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+
+		// Deep-merge terminal settings so new fields don't disappear after upgrade
+		const { DEFAULT_TERMINAL_SETTINGS } = await import('./terminal');
+		this.settings.terminal = Object.assign({}, DEFAULT_TERMINAL_SETTINGS, this.settings.terminal);
 
 		// 注入本地 Embedding 预设（首次安装时）
 		const LOCAL_PRESETS = [
