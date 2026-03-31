@@ -223,8 +223,8 @@ export class TerminalView extends ItemView {
             if (e.key === 'Tab') {
                 e.preventDefault();
                 e.stopImmediatePropagation();
-                if (e.shiftKey) {
-                    if (this.ptyManager.alive) this.ptyManager.write('\x1b[Z');
+                if (this.ptyManager.alive) {
+                    this.ptyManager.write(e.shiftKey ? '\x1b[Z' : '\t');
                 }
                 return;
             }
