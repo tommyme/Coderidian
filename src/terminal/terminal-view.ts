@@ -1,4 +1,4 @@
-import { ItemView, Notice, Scope, WorkspaceLeaf, ViewStateResult } from 'obsidian';
+import { ItemView, Notice, Scope, TFile, WorkspaceLeaf, ViewStateResult } from 'obsidian';
 import { Terminal, FitAddon } from 'ghostty-web';
 import { PtyManager } from './pty-manager';
 import { GhosttyConfig } from './ghostty-config';
@@ -15,6 +15,7 @@ export const TERMINAL_VIEW_TYPE = 'coderidian-terminal';
 const CHAR_MEASURE_ID = 'coderidian-terminal-char-measure';
 
 export class TerminalView extends ItemView {
+    navigation = false; // Prevent workspace:close (Cmd+W) from closing the terminal
     private terminal: Terminal | null = null;
     private fitAddon: FitAddon | null = null;
     private ptyManager: PtyManager = new PtyManager();
@@ -79,6 +80,8 @@ export class TerminalView extends ItemView {
         this.termEl.addEventListener('focusout', () => {
             this.app.keymap.popScope(this._scope);
         });
+
+        this.setupDragDrop();
 
         this.resizeObserver = new ResizeObserver(() => this.handleResize());
         this.resizeObserver.observe(this.termEl);
@@ -215,6 +218,17 @@ export class TerminalView extends ItemView {
         const effectiveKeybinds = buildEffectiveKeybinds(gc.keybinds);
 
         this.termEl!.addEventListener('keydown', (e: KeyboardEvent) => {
+            // 0. Tab / Shift+Tab: prevent browser focus traversal.
+            //    Regular Tab falls through to ghostty-web; Shift+Tab sends Back-Tab (\x1b[Z).
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                if (e.shiftKey) {
+                    if (this.ptyManager.alive) this.ptyManager.write('\x1b[Z');
+                }
+                return;
+            }
+
             // 1. Pass-to-Obsidian: intercept, prevent terminal from receiving,
             //    re-dispatch to document.body so Obsidian's bubble handlers fire.
             if (isPassToObsidian(e, this.settings.passToObsidian)) {
@@ -302,6 +316,46 @@ export class TerminalView extends ItemView {
             if (mods.has('meta'))  obsidianMods.push('Meta');
             this._scope.register(obsidianMods, key, (e) => { e.preventDefault(); });
         }
+    }
+
+    private setupDragDrop(): void {
+        this.termEl!.addEventListener('dragover', (e: DragEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+        });
+
+        this.termEl!.addEventListener('drop', (e: DragEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const adapter = (this.app.vault.adapter as unknown as { getBasePath?: () => string });
+            const basePath = adapter.getBasePath?.() ?? '';
+
+            // 1. Obsidian internal drag (File Explorer)
+            const draggable = (this.app as unknown as { dragManager?: { draggable?: { file?: TFile } } })
+                .dragManager?.draggable;
+            if (draggable?.file) {
+                const absPath = require('path').join(basePath, draggable.file.path);
+                if (this.ptyManager.alive) this.ptyManager.write(this.shellQuotePath(absPath) + ' ');
+                return;
+            }
+
+            // 2. Filesystem file dragged from Finder (Electron provides .path on File objects)
+            const files = e.dataTransfer?.files;
+            if (files && files.length > 0) {
+                const filePath = (files[0] as unknown as { path?: string }).path;
+                if (filePath && this.ptyManager.alive) {
+                    this.ptyManager.write(this.shellQuotePath(filePath) + ' ');
+                }
+                return;
+            }
+        });
+    }
+
+    /** Wrap a path in single quotes for safe shell insertion (escapes embedded single quotes). */
+    private shellQuotePath(p: string): string {
+        return "'" + p.replace(/'/g, "'\\''") + "'";
     }
 
     private measureCharDimensions(): void {

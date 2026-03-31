@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       ghostty-web:
-        specifier: ^0.4.0
-        version: 0.4.0
+        specifier: file:/Users/flag/repos/ghostty-web
+        version: file:../ghostty-web
       openai:
         specifier: ^6.25.0
         version: 6.25.0
@@ -491,8 +491,8 @@ packages:
   functional-red-black-tree@1.0.1:
     resolution: {integrity: sha512-dsKNQNdj6xA3T+QlADDA7mOSlX0qiMINjn0cgr+eGHGsbSHzTabcIogz2+p/iqP1Xs6EP/sS2SbqH+brGTbq0g==}
 
-  ghostty-web@0.4.0:
-    resolution: {integrity: sha512-0puDBik2qapbD/QQBW9o5ZHfXnZBqZWx/ctBiVtKZ6ZLds4NYb+wZuw1cRLXZk9zYovIQ908z3rvFhexAvc5Hg==}
+  ghostty-web@file:../ghostty-web:
+    resolution: {directory: ../ghostty-web, type: directory}
 
   glob-parent@5.1.2:
     resolution: {integrity: sha512-AOIgSQCepiJYwP3ARnGx+5VnTu2HBYdzbGP45eLw1vr3zB3vZLeyed1sC9hnbcOc9/SrMyM5RPQrkGz4aS9Zow==}
@@ -1229,7 +1229,7 @@ snapshots:
 
   functional-red-black-tree@1.0.1: {}
 
-  ghostty-web@0.4.0: {}
+  ghostty-web@file:../ghostty-web: {}
 
   glob-parent@5.1.2:
     dependencies:
