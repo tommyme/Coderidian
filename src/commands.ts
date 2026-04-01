@@ -482,6 +482,37 @@ export function registerCommands(plugin: MyPlugin) {
 		editorCallback: (editor: Editor, view: MarkdownView) => selectAllWordInstances(editor, view),
 	});
 
+	plugin.addCommand({
+		id: 'trim-selection-lines',
+		name: '[Editor] Trim Selection Lines',
+		editorCallback: (editor: Editor) =>
+			SelectionsProcessing.selectionsReplacer(editor, (s) =>
+				s.split('\n').map((line) => line.trim()).join('\n'),
+			),
+	});
+
+	plugin.addCommand({
+		id: 'start-select',
+		name: '[Editor] Start Select (Set Mark)',
+		editorCallback: (editor: Editor) => {
+			plugin.selectionMark = editor.getCursor();
+			new Notice('Mark set');
+		},
+	});
+
+	plugin.addCommand({
+		id: 'end-select',
+		name: '[Editor] End Select (Select to Mark)',
+		editorCallback: (editor: Editor) => {
+			if (!plugin.selectionMark) {
+				new Notice('No mark set — use "Start Select" first');
+				return;
+			}
+			editor.setSelection(plugin.selectionMark, editor.getCursor());
+			plugin.selectionMark = null;
+		},
+	});
+
 	// [FileExplorer] commands
 	plugin.addCommand({
 		id: 'toggle-file-hider',

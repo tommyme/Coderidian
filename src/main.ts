@@ -1,4 +1,4 @@
-import { MarkdownView, Notice, Plugin, addIcon, Editor, TFile } from 'obsidian';
+import { MarkdownView, Notice, Plugin, addIcon, Editor, TFile, EditorPosition } from 'obsidian';
 import { MyPluginSettings, DEFAULT_SETTINGS, SampleSettingTab } from './settings';
 import { ApiConfigItem, LlmApiManager } from './config/api-config-manager';
 import { registerCommands } from './commands';
@@ -27,6 +27,7 @@ export default class MyPlugin extends Plugin {
 	noteSimilarityService: NoteSimilarityService | null = null;
 	terminalService: TerminalService | null = null;
 	fileHiderService: FileHiderService | null = null;
+	selectionMark: EditorPosition | null = null;
 
 	async onload() {
 		await this.loadSettings();
