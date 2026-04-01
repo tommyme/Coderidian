@@ -28,6 +28,9 @@ export interface MyPluginSettings {
 	embeddingExcludeFolders: string[];
 	// Terminal settings
 	terminal: TerminalSettings;
+	// File Hider settings
+	fileHiderEnabled: boolean;
+	fileHiderPatterns: string[];
 }
 
 export const DEFAULT_SETTINGS: MyPluginSettings = {
@@ -52,6 +55,9 @@ export const DEFAULT_SETTINGS: MyPluginSettings = {
 	embeddingExcludeFolders: [],
 	// Terminal default settings
 	terminal: DEFAULT_TERMINAL_SETTINGS,
+	// File Hider default settings
+	fileHiderEnabled: false,
+	fileHiderPatterns: [],
 };
 
 export class SampleSettingTab extends PluginSettingTab {
@@ -239,6 +245,7 @@ export class SampleSettingTab extends PluginSettingTab {
 		}
 
 		this.renderTerminalSettings(containerEl);
+		this.renderFileHiderSettings(containerEl);
 	}
 
 	private renderTerminalSettings(containerEl: HTMLElement): void {
@@ -339,6 +346,44 @@ export class SampleSettingTab extends PluginSettingTab {
 					this.plugin.settings.terminal.blockFromObsidian = v.split(',').map(s => s.trim()).filter(Boolean);
 					await this.plugin.saveSettings();
 				}));
+	}
+
+	private renderFileHiderSettings(containerEl: HTMLElement): void {
+		containerEl.createEl('h2', { text: 'File Hider Settings' });
+
+		new Setting(containerEl)
+			.setName('Hide files in explorer')
+			.setDesc('Toggle hiding of matched files/folders in the file explorer.')
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.fileHiderEnabled)
+					.onChange(async (value) => {
+						this.plugin.settings.fileHiderEnabled = value;
+						await this.plugin.saveSettings();
+						this.plugin.fileHiderService?.setEnabled(value);
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Hide patterns')
+			.setDesc(
+				'One pattern per line. Glob examples: *.excalidraw.md, _*, assets/**\n' +
+				'Regex: use {regex} prefix, e.g. {regex}^_',
+			)
+			.addTextArea((ta) => {
+				ta.setPlaceholder('*.excalidraw.md\nassets/**\n{regex}^_')
+					.setValue(this.plugin.settings.fileHiderPatterns.join('\n'))
+					.onChange(async (value) => {
+						this.plugin.settings.fileHiderPatterns = value
+							.split('\n')
+							.filter((s) => s.trim().length > 0);
+						await this.plugin.saveSettings();
+						this.plugin.fileHiderService?.refresh();
+					});
+				ta.inputEl.rows = 6;
+				ta.inputEl.style.width = '100%';
+				ta.inputEl.style.fontFamily = 'var(--font-monospace)';
+			});
 	}
 
 	private openEmbeddingConfigModal(): void {

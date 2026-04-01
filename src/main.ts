@@ -17,6 +17,7 @@ import { createHttpInterceptor, HttpInterceptor } from './interceptors';
 import { NoteSimilarityService } from './services/note-similarity/note-similarity-service';
 import { SIMILAR_NOTES_VIEW_TYPE, SimilarNotesView } from './views/similar-notes-view';
 import { TerminalService, TERMINAL_VIEW_TYPE } from './terminal';
+import { FileHiderService } from './services/file-hider/file-hider-service';
 
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
@@ -25,6 +26,7 @@ export default class MyPlugin extends Plugin {
 	private toolbarManager: ImageToolbarManager | null = null;
 	noteSimilarityService: NoteSimilarityService | null = null;
 	terminalService: TerminalService | null = null;
+	fileHiderService: FileHiderService | null = null;
 
 	async onload() {
 		await this.loadSettings();
@@ -86,6 +88,14 @@ export default class MyPlugin extends Plugin {
 		this.app.workspace.onLayoutReady(async () => {
 			// 初始化 Terminal 服务（WASM + Ghostty config）
 			await this.initTerminalService();
+
+			// 初始化 File Hider 服务
+			this.fileHiderService = new FileHiderService(
+				this.app,
+				() => this.settings.fileHiderPatterns,
+				() => this.settings.fileHiderEnabled,
+			);
+			this.fileHiderService.initialize();
 
 			// Note Similarity 必须在 vault ready 后启动，否则 getMarkdownFiles() 返回空列表
 			this.initNoteSimilarity();
@@ -253,6 +263,7 @@ export default class MyPlugin extends Plugin {
 		NoteSimilarityService.destroyAllProviders();
 		this.app.workspace.detachLeavesOfType(SIMILAR_NOTES_VIEW_TYPE);
 		this.terminalService?.destroy();
+		this.fileHiderService?.destroy();
 	}
 
 	/**

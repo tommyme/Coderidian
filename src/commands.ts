@@ -315,4 +315,16 @@ export function registerCommands(plugin: MyPlugin) {
 		name: '[Terminal] Open terminal — Floating window',
 		callback: () => plugin.terminalService ? plugin.terminalService.openTerminal('window', true) : terminalNotReady(),
 	});
+
+	// [FileExplorer] commands
+	plugin.addCommand({
+		id: 'toggle-file-hider',
+		name: '[FileExplorer] Toggle File Hiding',
+		callback: () => {
+			plugin.settings.fileHiderEnabled = !plugin.settings.fileHiderEnabled;
+			plugin.fileHiderService?.setEnabled(plugin.settings.fileHiderEnabled);
+			plugin.saveSettings();
+			new Notice(plugin.settings.fileHiderEnabled ? 'File hiding enabled' : 'File hiding disabled');
+		},
+	});
 }
