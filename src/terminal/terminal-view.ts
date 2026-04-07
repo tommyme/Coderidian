@@ -26,6 +26,7 @@ export class TerminalView extends ItemView {
     private charHeight = 16;
     private _scope: Scope = new Scope();
     private _dataDisposable: { dispose: () => void } | null = null;
+    private _resizeTimer: ReturnType<typeof setTimeout> | null = null;
 
     constructor(
         leaf: WorkspaceLeaf,
@@ -83,7 +84,11 @@ export class TerminalView extends ItemView {
 
         this.setupDragDrop();
 
-        this.resizeObserver = new ResizeObserver(() => this.handleResize());
+        this.resizeObserver = new ResizeObserver(() => {
+            // Debounce: fitAddon.fit() changes dimensions which can re-trigger the observer
+            if (this._resizeTimer) clearTimeout(this._resizeTimer);
+            this._resizeTimer = setTimeout(() => this.handleResize(), 100);
+        });
         this.resizeObserver.observe(this.termEl);
 
         // Initial fit must run after browser layout; clientHeight is 0 until then.
@@ -136,9 +141,9 @@ export class TerminalView extends ItemView {
         this._dataDisposable = null;
 
         this.ptyManager.onData = (data: Uint8Array) => {
-            this.terminal?.write(data, () => {
-                this.terminal?.scrollToBottom();
-            });
+            // ghostty-web's write() already calls scrollToBottom() internally,
+            // so no need to scroll again in the callback.
+            this.terminal?.write(data);
         };
 
         this.ptyManager.onExit = (code: number | null) => {
