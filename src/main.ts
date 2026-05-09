@@ -18,6 +18,7 @@ import { NoteSimilarityService } from './services/note-similarity/note-similarit
 import { SIMILAR_NOTES_VIEW_TYPE, SimilarNotesView } from './views/similar-notes-view';
 import { TerminalService, TERMINAL_VIEW_TYPE } from './terminal';
 import { FileHiderService } from './services/file-hider/file-hider-service';
+import { LocalGraphService, LocalGraphPanel } from './services/local-graph';
 
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
@@ -28,10 +29,13 @@ export default class MyPlugin extends Plugin {
 	terminalService: TerminalService | null = null;
 	fileHiderService: FileHiderService | null = null;
 	selectionMark: EditorPosition | null = null;
+	localGraphService: LocalGraphService;
+	private localGraphPanel: LocalGraphPanel | null = null;
 
 	async onload() {
 		await this.loadSettings();
 		this.vscodeService = new VSCodeService(this.app, this.settings);
+		this.localGraphService = new LocalGraphService(this.app);
 		this.registerExtensions(['ai'], 'markdown');
 
 		// 初始化全局 LLM API 管理器
@@ -265,6 +269,14 @@ export default class MyPlugin extends Plugin {
 		this.app.workspace.detachLeavesOfType(SIMILAR_NOTES_VIEW_TYPE);
 		this.terminalService?.destroy();
 		this.fileHiderService?.destroy();
+		this.localGraphPanel?.close();
+	}
+
+	openLocalGraph(file?: TFile): void {
+		if (!this.localGraphPanel) {
+			this.localGraphPanel = new LocalGraphPanel(this.app, this.localGraphService);
+		}
+		this.localGraphPanel.open(file);
 	}
 
 	/**

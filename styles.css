@@ -583,3 +583,250 @@ If your plugin does not need CSS, delete this file.
 .coderidian-hide-files .coderidian-hidden {
   display: none !important;
 }
+
+/* ── Local Graph ─────────────────────────────────────────────────────────────── */
+
+/* Floating panel override for graph (bigger default size) */
+.coderidian-graph-panel {
+  width: 50vw;
+  height: 60vh;
+  top: 60px;
+  right: 20px;
+}
+
+/* Compact titlebar for graph panel */
+.cg-panel-titlebar {
+  display: flex;
+  align-items: center;
+  padding: 5px 8px;
+  background: var(--background-secondary);
+  border-bottom: 1px solid var(--background-modifier-border);
+  cursor: grab;
+  user-select: none;
+  flex-shrink: 0;
+}
+.cg-panel-titlebar:active { cursor: grabbing; }
+.cg-panel-title {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+.cg-panel-actions {
+  display: flex;
+  gap: 2px;
+}
+.cg-pin-btn,
+.cg-close-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, color 0.1s;
+}
+.cg-pin-btn:hover,
+.cg-close-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.cg-pin-active {
+  color: var(--interactive-accent) !important;
+}
+
+/* Body of the floating panel: no overflow/padding, graph fills it */
+.coderidian-graph-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Popout button — top-left, symmetrical to Obsidian's native top-right buttons */
+.coderidian-graph-popout-btn {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 10;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.25s ease, background 0.15s ease, color 0.15s ease;
+}
+.coderidian-graph-canvas:hover .coderidian-graph-popout-btn {
+  opacity: 1;
+}
+.coderidian-graph-popout-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* Canvas area — height set via inline aspect-ratio by JS */
+.coderidian-graph-canvas {
+  width: 100%;
+  position: relative;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--background-secondary);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+
+/* Override for floating panel: fill height, no aspect-ratio */
+.coderidian-graph-panel-body .coderidian-graph-canvas {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: unset;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+}
+
+/* Graph area fills canvas minus controls bar */
+.cg-graph-area {
+  position: absolute;
+  inset: 0 0 36px 0;
+}
+.coderidian-graph-panel-body .cg-graph-area {
+  inset: 0 0 36px 0;
+}
+
+/* Controls bar — always visible at bottom */
+.cg-controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 10px;
+  background: var(--background-secondary);
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.cg-ctrl-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cg-ctrl-sep {
+  width: 1px;
+  height: 14px;
+  background: var(--background-modifier-border);
+  margin: 0 6px;
+}
+
+.cg-ctrl-label {
+  font-size: 11px;
+  color: var(--text-faint);
+  user-select: none;
+  letter-spacing: 0.02em;
+}
+
+.cg-ctrl-btn {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, color 0.1s;
+}
+.cg-ctrl-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.cg-ctrl-val {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+  min-width: 14px;
+  text-align: center;
+  user-select: none;
+}
+
+.coderidian-graph-loading {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 24px;
+  font-size: var(--font-ui-small);
+}
+
+/* SVG graph elements */
+.cg-edge {
+  stroke: var(--text-faint);
+  stroke-width: 1.5;
+  fill: none;
+}
+
+.cg-arrow {
+  fill: var(--text-faint);
+}
+
+.cg-node {
+  cursor: pointer;
+}
+
+.cg-node-current {
+  fill: var(--interactive-accent);
+  stroke: none;
+}
+
+.cg-node-other {
+  fill: var(--background-modifier-border);
+  stroke: var(--text-muted);
+  stroke-width: 1.5;
+}
+
+.cg-node:hover .cg-node-current {
+  fill: var(--interactive-accent-hover);
+}
+.cg-node:hover .cg-node-other {
+  stroke: var(--interactive-accent);
+}
+
+.cg-label {
+  font-size: 11px;
+  fill: var(--text-muted);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Node hover scale */
+.cg-node circle {
+  transition: transform 0.15s ease;
+}
+.cg-node:hover circle {
+  transform: scale(1.15);
+  transform-box: fill-box;
+  transform-origin: center;
+}

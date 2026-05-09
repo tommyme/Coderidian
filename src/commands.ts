@@ -191,6 +191,12 @@ export function registerCommands(plugin: MyPlugin) {
 	});
 
 	plugin.addCommand({
+		id: 'graph-open-floating',
+		name: '[Graph] Open floating local graph',
+		callback: () => plugin.openLocalGraph(),
+	});
+
+	plugin.addCommand({
 		id: 'reindex-all-notes',
 		name: '[Similarity] Reindex All Notes',
 		callback: async () => {
