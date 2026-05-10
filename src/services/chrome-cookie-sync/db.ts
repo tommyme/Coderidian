@@ -1,6 +1,9 @@
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { homedir } from 'os';
 import { join } from 'path';
+
+const execAsync = promisify(exec);
 
 export interface RawCookieRow {
     name: string;
@@ -20,7 +23,7 @@ export class CookieDbLockedError extends Error {
     }
 }
 
-export function readChromeCookies(): RawCookieRow[] {
+export async function readChromeCookies(): Promise<RawCookieRow[]> {
     const dbPath = join(
         homedir(),
         'Library/Application Support/Google/Chrome/Default/Cookies'
@@ -31,12 +34,16 @@ export function readChromeCookies(): RawCookieRow[] {
 
     let output: string;
     try {
-        output = execSync(`sqlite3 -json "${dbPath}" '${query}'`, {
-            encoding: 'utf-8',
+        const result = await execAsync(`sqlite3 -json "${dbPath}" '${query}'`, {
             timeout: 10000,
             maxBuffer: 20 * 1024 * 1024, // 20 MB — Chrome can have thousands of cookies
         });
-    } catch {
+        output = result.stdout;
+    } catch (e: unknown) {
+        const msg = (e as { message?: string })?.message ?? '';
+        if (msg.includes('unable to open') || msg.includes('no such file')) {
+            throw new Error('Chrome Cookies database not found — is Chrome installed at the default location?');
+        }
         throw new CookieDbLockedError();
     }
 

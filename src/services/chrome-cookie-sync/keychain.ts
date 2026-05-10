@@ -1,9 +1,22 @@
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
-export function getChromeKeychainPassword(): string {
-    const result = execSync(
-        'security find-generic-password -w -a "Chrome" -s "Chrome Safe Storage"',
-        { encoding: 'utf-8', timeout: 15000 }
-    );
-    return result.trim();
+const execAsync = promisify(exec);
+
+export class KeychainAccessDeniedError extends Error {
+    constructor() {
+        super('Keychain access denied');
+    }
+}
+
+export async function getChromeKeychainPassword(): Promise<string> {
+    try {
+        const { stdout } = await execAsync(
+            'security find-generic-password -w -a "Chrome" -s "Chrome Safe Storage"',
+            { timeout: 15000 }
+        );
+        return stdout.trim();
+    } catch {
+        throw new KeychainAccessDeniedError();
+    }
 }

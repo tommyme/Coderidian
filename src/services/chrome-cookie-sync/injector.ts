@@ -37,11 +37,16 @@ export async function injectCookies(
 	rows: RawCookieRow[],
 	key: Buffer
 ): Promise<{ success: number; failed: number }> {
-	// eslint-disable-next-line @typescript-eslint/no-require-imports
-	const { remote } = require('electron') as {
-		remote: { session: { defaultSession: ElectronSession } };
-	};
-	const cookieStore = remote.session.defaultSession.cookies;
+	let cookieStore: ElectronSession['cookies'];
+	try {
+		// eslint-disable-next-line @typescript-eslint/no-require-imports
+		const { remote } = require('electron') as {
+			remote: { session: { defaultSession: ElectronSession } };
+		};
+		cookieStore = remote.session.defaultSession.cookies;
+	} catch {
+		return { success: 0, failed: rows.length };
+	}
 
 	let success = 0;
 	let failed = 0;
