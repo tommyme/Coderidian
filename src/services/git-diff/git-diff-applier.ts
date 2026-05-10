@@ -171,7 +171,6 @@ function applyHunk(
   hunk: string,
 ): { success: true; content: string } | { success: false; error: string } {
   const rawLines = hunk.split('\n');
-  // Trim only leading and trailing empty lines (preserve internal blank lines)
   let trimStart = 0;
   let trimEnd = rawLines.length;
   while (trimStart < trimEnd && rawLines[trimStart] === '') trimStart++;
@@ -180,28 +179,41 @@ function applyHunk(
   if (hunkLines.length === 0) return { success: false, error: 'empty hunk' };
 
   const fileLines = fileContent.split('\n');
+  const MAX_CTX = 3;
 
-  // Start anchor: first ≤3 lines of hunk
-  const startAnchor = hunkLines.slice(0, Math.min(3, hunkLines.length));
-  // End anchor: last ≤3 lines of hunk (avoid overlapping start anchor)
-  const endAnchorStart = Math.max(startAnchor.length, hunkLines.length - 3);
-  const endAnchor = hunkLines.slice(endAnchorStart);
+  // Start context: longest prefix of hunk (0–3 lines) that exists in the file
+  let startCtxLen = 0;
+  let insertStart = 0; // file index right after the start context
+  for (let len = Math.min(MAX_CTX, hunkLines.length); len >= 1; len--) {
+    const pos = findAnchor(fileLines, hunkLines.slice(0, len), 0);
+    if (pos !== -1) {
+      startCtxLen = len;
+      insertStart = pos + len;
+      break;
+    }
+  }
 
-  const startIdx = findAnchor(fileLines, startAnchor, 0);
-  if (startIdx === -1) return { success: false, error: 'start anchor not found' };
+  // End context: longest suffix of hunk (0–3 lines) that exists in the file
+  // after insertStart, not overlapping start context
+  const maxEndCtx = Math.min(MAX_CTX, hunkLines.length - startCtxLen);
+  let endCtxLen = 0;
+  let insertEnd = insertStart; // file index where end context begins
+  for (let len = maxEndCtx; len >= 1; len--) {
+    const pos = findAnchor(fileLines, hunkLines.slice(hunkLines.length - len), insertStart);
+    if (pos !== -1) {
+      endCtxLen = len;
+      insertEnd = pos;
+      break;
+    }
+  }
 
-  const endIdx =
-    endAnchor.length > 0
-      ? findAnchor(fileLines, endAnchor, startIdx)
-      : startIdx + hunkLines.length;
-  if (endIdx === -1) return { success: false, error: 'end anchor not found' };
-
-  const endExclusive = endIdx + (endAnchor.length || 0);
+  // New content = hunk lines between start and end context
+  const newContent = hunkLines.slice(startCtxLen, hunkLines.length - endCtxLen);
 
   const newLines = [
-    ...fileLines.slice(0, startIdx),
-    ...hunkLines,
-    ...fileLines.slice(endExclusive),
+    ...fileLines.slice(0, insertStart),
+    ...newContent,
+    ...fileLines.slice(insertEnd),
   ];
 
   return { success: true, content: newLines.join('\n') };

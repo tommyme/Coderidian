@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { execPromise } from '../../utils';
 import { SEP, SEP2, FileChangeType, FileEntry, FormatResult } from './types';
 
@@ -6,21 +8,38 @@ export async function formatFolderDiff(
   folderRelPath: string,
 ): Promise<FormatResult> {
   const folderArg = folderRelPath ? `${folderRelPath}/` : '.';
-  const { stdout } = await execPromise(
-    `git -C "${vaultBasePath}" diff HEAD -U3 -- "${folderArg}"`,
-  );
-
-  if (!stdout.trim()) return { content: '', files: [] };
-
-  const blocks = splitDiffBlocks(stdout);
   const sections: string[] = [];
   const files: FileEntry[] = [];
 
-  for (const block of blocks) {
-    const parsed = parseBlock(block, folderRelPath);
-    if (!parsed) continue;
-    files.push({ name: parsed.name, type: parsed.type });
-    sections.push(buildSection(parsed.name, parsed.type, parsed.hunks, parsed.newContent));
+  // Tracked changes (modified, deleted, staged-new)
+  const { stdout } = await execPromise(
+    `git -C "${vaultBasePath}" diff HEAD -U3 -- "${folderArg}"`,
+  );
+  if (stdout.trim()) {
+    for (const block of splitDiffBlocks(stdout)) {
+      const parsed = parseBlock(block, folderRelPath);
+      if (!parsed) continue;
+      files.push({ name: parsed.name, type: parsed.type });
+      sections.push(buildSection(parsed.name, parsed.type, parsed.hunks, parsed.newContent));
+    }
+  }
+
+  // Untracked files (new files not yet staged)
+  const { stdout: untrackedOut } = await execPromise(
+    `git -C "${vaultBasePath}" ls-files --others --exclude-standard -- "${folderArg}"`,
+  );
+  const prefix = folderRelPath ? `${folderRelPath}/` : '';
+  for (const repoRelPath of untrackedOut.trim().split('\n').filter(Boolean)) {
+    const relPath = repoRelPath.startsWith(prefix) ? repoRelPath.slice(prefix.length) : repoRelPath;
+    const name = relPath.endsWith('.md') ? relPath.slice(0, -3) : relPath;
+    let newContent: string;
+    try {
+      newContent = readFileSync(join(vaultBasePath, repoRelPath), 'utf8');
+    } catch {
+      continue;
+    }
+    files.push({ name, type: 'new' });
+    sections.push(buildSection(name, 'new', [], newContent));
   }
 
   return { content: sections.join('\n'), files };
