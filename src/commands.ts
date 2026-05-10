@@ -8,6 +8,9 @@ import { ConfirmModal, zipVault } from './utils';
 import { existsSync } from 'fs';
 import { openSectionTranslationModal } from './views/section-translation-modal';
 import { HeadingLevelModal } from './views/heading-level-modal';
+import { formatFolderDiff } from './services/git-diff/git-diff-formatter';
+import { GitDiffModal } from './services/git-diff/git-diff-modal';
+import { GitApplyModal } from './services/git-diff/git-apply-modal';
 
 /**
  * Wrap selected content with HTML tags
@@ -527,6 +530,52 @@ export function registerCommands(plugin: MyPlugin) {
 			}
 			editor.setSelection(plugin.selectionMark, editor.getCursor());
 			plugin.selectionMark = null;
+		},
+	});
+
+	// [Git] commands
+	plugin.addCommand({
+		id: 'git-copy-folder-diff',
+		name: '[Git] Copy Folder Diff',
+		callback: async () => {
+			const activeFile = plugin.app.workspace.getActiveFile();
+			if (!activeFile) {
+				new Notice('No active file');
+				return;
+			}
+			const folderRelPath = activeFile.parent?.path ?? '';
+			const vaultBasePath = (plugin.app.vault.adapter as any).basePath as string;
+			const folderName = (folderRelPath.split('/').pop() ?? folderRelPath) || 'vault root';
+
+			const notice = new Notice('Getting git diff…', 0);
+			try {
+				const result = await formatFolderDiff(vaultBasePath, folderRelPath);
+				notice.hide();
+				if (result.files.length === 0) {
+					new Notice('No changes in this folder');
+					return;
+				}
+				new GitDiffModal(plugin.app, result.content, result.files, folderName).open();
+			} catch (e) {
+				notice.hide();
+				const msg = e instanceof Error ? e.message : String(e);
+				new Notice(`Git error: ${msg}`);
+				console.error('[git-copy-folder-diff]', e);
+			}
+		},
+	});
+
+	plugin.addCommand({
+		id: 'git-apply-folder-diff',
+		name: '[Git] Apply Folder Diff',
+		callback: () => {
+			const activeFile = plugin.app.workspace.getActiveFile();
+			if (!activeFile) {
+				new Notice('No active file');
+				return;
+			}
+			const folderPath = activeFile.parent?.path ?? '';
+			new GitApplyModal(plugin.app, folderPath).open();
 		},
 	});
 
