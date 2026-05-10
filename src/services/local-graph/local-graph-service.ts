@@ -43,9 +43,13 @@ export class LocalGraphService {
 				}
 			}
 
-			// Incoming links
+			// Incoming links — .data may be a Map or a plain object depending on Obsidian version
 			const backlinks = this.app.metadataCache.getBacklinksForFile(file);
-			for (const sourcePath of Object.keys(backlinks.data)) {
+			const blData = backlinks?.data as any;
+			const blPaths: string[] = blData
+				? (typeof blData.keys === 'function' ? [...blData.keys()] : Object.keys(blData))
+				: [];
+			for (const sourcePath of blPaths) {
 				this.recordEdge(edgeMap, sourcePath, item.path);
 				if (!visited.has(sourcePath)) {
 					queue.push({ path: sourcePath, hops: item.hops + 1 });

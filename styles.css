@@ -586,12 +586,15 @@ If your plugin does not need CSS, delete this file.
 
 /* ── Local Graph ─────────────────────────────────────────────────────────────── */
 
-/* Floating panel override for graph (bigger default size) */
+/* Floating panel — compact default, auto-resizes after layout settles */
 .coderidian-graph-panel {
-  width: 50vw;
-  height: 60vh;
+  width: 380px;
+  height: 380px;
   top: 60px;
   right: 20px;
+}
+.coderidian-graph-panel.cg-auto-resizing {
+  transition: width 0.2s ease, height 0.2s ease;
 }
 
 /* Compact titlebar for graph panel */
@@ -781,16 +784,38 @@ If your plugin does not need CSS, delete this file.
   font-size: var(--font-ui-small);
 }
 
-/* SVG graph elements */
-.cg-edge {
-  stroke: var(--text-faint);
+/* SVG graph elements — edge types */
+.cg-edge-outlink {
+  stroke: var(--interactive-accent);
   stroke-width: 1.5;
+  stroke-opacity: 0.7;
+  fill: none;
+}
+.cg-edge-inlink {
+  stroke: var(--text-muted);
+  stroke-width: 1.2;
+  stroke-opacity: 0.5;
+  stroke-dasharray: 5 3;
+  fill: none;
+}
+.cg-edge-bidir {
+  stroke: var(--interactive-accent);
+  stroke-width: 2;
+  stroke-opacity: 0.9;
+  fill: none;
+}
+.cg-edge-neutral {
+  stroke: var(--text-faint);
+  stroke-width: 1;
+  stroke-opacity: 0.35;
   fill: none;
 }
 
-.cg-arrow {
-  fill: var(--text-faint);
-}
+/* Arrow fill colors per type */
+.cg-arrow-outlink { fill: var(--interactive-accent); }
+.cg-arrow-inlink  { fill: var(--text-muted); }
+.cg-arrow-bidir   { fill: var(--interactive-accent); }
+.cg-arrow-neutral { fill: var(--text-faint); }
 
 .cg-node {
   cursor: pointer;

@@ -23,6 +23,7 @@ export class LocalGraphPanel {
 	private depth = 2;
 	private sparsity = 3;
 	private isPinned = false;
+	private panelSized = false;
 
 	constructor(
 		private app: App,
@@ -56,6 +57,7 @@ export class LocalGraphPanel {
 		this.graphAreaEl = null;
 		this.currentFile = null;
 		this.isPinned = false;
+		this.panelSized = false;
 	}
 
 	isOpen(): boolean {
@@ -72,6 +74,7 @@ export class LocalGraphPanel {
 
 	private async renderGraph(file: TFile): Promise<void> {
 		if (!this.graphAreaEl) return;
+		if (file !== this.currentFile) this.panelSized = false;
 		this.currentFile = file;
 		this.renderer?.destroy();
 		this.graphAreaEl.empty();
@@ -92,11 +95,34 @@ export class LocalGraphPanel {
 				(nodeId) => this.navigateTo(nodeId, file.path),
 				charge,
 				distance,
+				(bounds) => this.autoFitPanel(bounds),
 			);
 			this.renderer.render();
 		} catch (err) {
 			loading.textContent = `加载失败: ${err}`;
 		}
+	}
+
+	private autoFitPanel(bounds: { minX: number; maxX: number; minY: number; maxY: number }): void {
+		if (!this.el || this.panelSized) return;
+		this.panelSized = true;
+		const PAD = 40;
+		const CHROME_H = 32 + 36; // titlebar + controls
+		const contentW = bounds.maxX - bounds.minX + PAD * 2;
+		const contentH = bounds.maxY - bounds.minY + PAD * 2;
+		const panelW = Math.max(280, Math.min(700, contentW));
+		const panelH = Math.max(260, Math.min(650, contentH + CHROME_H));
+
+		this.el.addClass('cg-auto-resizing');
+		this.el.style.width = `${panelW}px`;
+		this.el.style.height = `${panelH}px`;
+		const onEnd = () => {
+			this.el?.removeClass('cg-auto-resizing');
+			this.el?.removeEventListener('transitionend', onEnd);
+		};
+		this.el.addEventListener('transitionend', onEnd);
+
+		this.renderer?.centerContent(panelW, panelH - CHROME_H);
 	}
 
 	private navigateTo(nodeId: string, sourcePath: string): void {

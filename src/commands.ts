@@ -197,6 +197,17 @@ export function registerCommands(plugin: MyPlugin) {
 	});
 
 	plugin.addCommand({
+		id: 'graph-insert-block',
+		name: '[Graph] Insert local graph block',
+		editorCallback: (editor) => {
+			const cursor = editor.getCursor();
+			const block = '```coderidian-graph\ndepth: 2\nsparsity: 3\nheight: 40\n```';
+			editor.replaceRange(block, cursor);
+			editor.setCursor({ line: cursor.line + 5, ch: 0 });
+		},
+	});
+
+	plugin.addCommand({
 		id: 'reindex-all-notes',
 		name: '[Similarity] Reindex All Notes',
 		callback: async () => {

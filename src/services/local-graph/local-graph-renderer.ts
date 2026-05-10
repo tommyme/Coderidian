@@ -37,6 +37,9 @@ export class LocalGraphRenderer {
 	private readonly uid = ++_uid;
 	private chargeForceFn: ForceManyBody<SimNode> | null = null;
 	private linkForceFn: ForceLink<SimNode, SimEdge> | null = null;
+	private viewState = { scale: 1, tx: 0, ty: 0 };
+	private applyTransformFn: (() => void) | null = null;
+	private settledBounds: { minX: number; maxX: number; minY: number; maxY: number } | null = null;
 
 	constructor(
 		private container: HTMLElement,
@@ -45,6 +48,7 @@ export class LocalGraphRenderer {
 		private onClickNode?: (nodeId: string) => void,
 		private chargeStrength: number = -220,
 		private linkDistance: number = 90,
+		private onLayoutEnd?: (bounds: { minX: number; maxX: number; minY: number; maxY: number }) => void,
 	) {}
 
 	render(): void {
@@ -80,10 +84,14 @@ export class LocalGraphRenderer {
 		svg.style.display = 'block';
 		this.svgEl = svg;
 
-		// Arrow markers
+		// Arrow markers — one set per edge type
 		const defs = document.createElementNS(ns, 'defs');
-		defs.appendChild(this.makeArrow(ns, `cg-arr-end-${this.uid}`, false));
-		defs.appendChild(this.makeArrow(ns, `cg-arr-start-${this.uid}`, true));
+		const u = this.uid;
+		defs.appendChild(this.makeArrow(ns, `cg-arr-out-${u}`,   false, 'cg-arrow-outlink'));
+		defs.appendChild(this.makeArrow(ns, `cg-arr-in-${u}`,    false, 'cg-arrow-inlink'));
+		defs.appendChild(this.makeArrow(ns, `cg-arr-bi-e-${u}`,  false, 'cg-arrow-bidir'));
+		defs.appendChild(this.makeArrow(ns, `cg-arr-bi-s-${u}`,  true,  'cg-arrow-bidir'));
+		defs.appendChild(this.makeArrow(ns, `cg-arr-neu-${u}`,   false, 'cg-arrow-neutral'));
 		svg.appendChild(defs);
 
 		// Viewport group (zoom/pan target)
@@ -96,14 +104,33 @@ export class LocalGraphRenderer {
 		const nodesG = document.createElementNS(ns, 'g');
 		g.appendChild(nodesG);
 
-		// Build edge elements
+		// Build edge elements — classify by relationship to current node
+		const getEdgeInfo = (edge: SimEdge) => {
+			if (edge.type === 'bidirectional') return {
+				cls: 'cg-edge-bidir',
+				markerEnd: `url(#cg-arr-bi-e-${u})`,
+				markerStart: `url(#cg-arr-bi-s-${u})`,
+			};
+			if (edge.source.isCurrent) return {
+				cls: 'cg-edge-outlink',
+				markerEnd: `url(#cg-arr-out-${u})`,
+			};
+			if (edge.target.isCurrent) return {
+				cls: 'cg-edge-inlink',
+				markerEnd: `url(#cg-arr-in-${u})`,
+			};
+			return {
+				cls: 'cg-edge-neutral',
+				markerEnd: `url(#cg-arr-neu-${u})`,
+			};
+		};
+
 		const lineEls = simEdges.map((edge) => {
+			const { cls, markerEnd, markerStart } = getEdgeInfo(edge);
 			const line = document.createElementNS(ns, 'line');
-			line.setAttribute('class', 'cg-edge');
-			line.setAttribute('marker-end', `url(#cg-arr-end-${this.uid})`);
-			if (edge.type === 'bidirectional') {
-				line.setAttribute('marker-start', `url(#cg-arr-start-${this.uid})`);
-			}
+			line.setAttribute('class', cls);
+			line.setAttribute('marker-end', markerEnd);
+			if (markerStart) line.setAttribute('marker-start', markerStart);
 			edgesG.appendChild(line);
 			return line;
 		});
@@ -142,11 +169,12 @@ export class LocalGraphRenderer {
 			};
 		});
 
-		// Zoom/pan state
-		const state = { scale: 1, tx: 0, ty: 0 };
+		// Zoom/pan state (stored on class for centerContent())
+		this.viewState = { scale: 1, tx: 0, ty: 0 };
 		const applyTransform = () => {
-			g.setAttribute('transform', `translate(${state.tx},${state.ty}) scale(${state.scale})`);
+			g.setAttribute('transform', `translate(${this.viewState.tx},${this.viewState.ty}) scale(${this.viewState.scale})`);
 		};
+		this.applyTransformFn = applyTransform;
 
 		svg.addEventListener('wheel', (e: WheelEvent) => {
 			e.preventDefault();
@@ -154,10 +182,10 @@ export class LocalGraphRenderer {
 			const cx = e.clientX - rect.left;
 			const cy = e.clientY - rect.top;
 			const factor = e.deltaY < 0 ? 1.1 : 0.9;
-			const newScale = Math.max(0.1, Math.min(10, state.scale * factor));
-			state.tx = cx - (cx - state.tx) * (newScale / state.scale);
-			state.ty = cy - (cy - state.ty) * (newScale / state.scale);
-			state.scale = newScale;
+			const newScale = Math.max(0.1, Math.min(10, this.viewState.scale * factor));
+			this.viewState.tx = cx - (cx - this.viewState.tx) * (newScale / this.viewState.scale);
+			this.viewState.ty = cy - (cy - this.viewState.ty) * (newScale / this.viewState.scale);
+			this.viewState.scale = newScale;
 			applyTransform();
 		}, { passive: false });
 
@@ -165,11 +193,11 @@ export class LocalGraphRenderer {
 		svg.addEventListener('mousedown', (e: MouseEvent) => {
 			if ((e.target as SVGElement).closest('.cg-node')) return;
 			e.preventDefault();
-			const startX = e.clientX - state.tx;
-			const startY = e.clientY - state.ty;
+			const startX = e.clientX - this.viewState.tx;
+			const startY = e.clientY - this.viewState.ty;
 			const onMove = (me: MouseEvent) => {
-				state.tx = me.clientX - startX;
-				state.ty = me.clientY - startY;
+				this.viewState.tx = me.clientX - startX;
+				this.viewState.ty = me.clientY - startY;
 				applyTransform();
 			};
 			const onUp = () => {
@@ -197,8 +225,8 @@ export class LocalGraphRenderer {
 					const dy = me.clientY - startY;
 					if (Math.sqrt(dx * dx + dy * dy) > 5) setDragged();
 					const rect = svg.getBoundingClientRect();
-					node.fx = (me.clientX - rect.left - state.tx) / state.scale;
-					node.fy = (me.clientY - rect.top - state.ty) / state.scale;
+					node.fx = (me.clientX - rect.left - this.viewState.tx) / this.viewState.scale;
+					node.fy = (me.clientY - rect.top - this.viewState.ty) / this.viewState.scale;
 				};
 				const onUp = () => {
 					node.fx = null;
@@ -212,43 +240,72 @@ export class LocalGraphRenderer {
 			});
 		});
 
-		// Force simulation tick
+		// Force simulation
 		this.linkForceFn = forceLink<SimNode, SimEdge>(simEdges)
 			.id((d) => d.id)
 			.distance(this.linkDistance)
 			.strength(0.4);
 		this.chargeForceFn = forceManyBody<SimNode>().strength(this.chargeStrength);
 
+		const doTick = () => {
+			simEdges.forEach((edge, i) => {
+				const src = edge.source;
+				const tgt = edge.target;
+				const dx = (tgt.x ?? 0) - (src.x ?? 0);
+				const dy = (tgt.y ?? 0) - (src.y ?? 0);
+				const len = Math.sqrt(dx * dx + dy * dy) || 1;
+				const line = lineEls[i];
+
+				const startOffset = edge.type === 'bidirectional' ? src.r + ARROW_LEN : src.r;
+				line.setAttribute('x1', String((src.x ?? 0) + (dx / len) * startOffset));
+				line.setAttribute('y1', String((src.y ?? 0) + (dy / len) * startOffset));
+				line.setAttribute('x2', String((tgt.x ?? 0) - (dx / len) * (tgt.r + ARROW_LEN)));
+				line.setAttribute('y2', String((tgt.y ?? 0) - (dy / len) * (tgt.r + ARROW_LEN)));
+			});
+			nodeEls.forEach(({ el, node }) => {
+				el.setAttribute('transform', `translate(${node.x ?? 0},${node.y ?? 0})`);
+			});
+		};
+
 		this.simulation = forceSimulation<SimNode, SimEdge>(simNodes)
 			.force('link', this.linkForceFn)
 			.force('charge', this.chargeForceFn)
 			.force('center', forceCenter<SimNode>(width / 2, height / 2))
 			.force('collide', forceCollide<SimNode>().radius((d) => d.r + 5))
-			.on('tick', () => {
-				simEdges.forEach((edge, i) => {
-					const src = edge.source;
-					const tgt = edge.target;
-					const dx = (tgt.x ?? 0) - (src.x ?? 0);
-					const dy = (tgt.y ?? 0) - (src.y ?? 0);
-					const len = Math.sqrt(dx * dx + dy * dy) || 1;
-					const line = lineEls[i];
+			.on('tick', doTick)   // used when simulation restarts (drag, updateLayout)
+			.on('end', () => {    // used when simulation settles after drag/updateLayout
+				if (!this.onLayoutEnd) return;
+				const minX = Math.min(...simNodes.map(n => n.x - n.r));
+				const maxX = Math.max(...simNodes.map(n => n.x + n.r));
+				const minY = Math.min(...simNodes.map(n => n.y - n.r));
+				const maxY = Math.max(...simNodes.map(n => n.y + n.r + 23));
+				this.settledBounds = { minX, maxX, minY, maxY };
+				this.onLayoutEnd(this.settledBounds);
+			})
+			.stop(); // prevent d3-timer from running asynchronously
 
-					const startOffset = edge.type === 'bidirectional' ? src.r + ARROW_LEN : src.r;
-					line.setAttribute('x1', String((src.x ?? 0) + (dx / len) * startOffset));
-					line.setAttribute('y1', String((src.y ?? 0) + (dy / len) * startOffset));
-					line.setAttribute('x2', String((tgt.x ?? 0) - (dx / len) * (tgt.r + ARROW_LEN)));
-					line.setAttribute('y2', String((tgt.y ?? 0) - (dy / len) * (tgt.r + ARROW_LEN)));
-				});
+		// Run all ticks synchronously so the graph is stable before first paint
+		const N = Math.ceil(
+			Math.log(this.simulation.alphaMin()) /
+			Math.log(1 - this.simulation.alphaDecay()),
+		);
+		this.simulation.tick(N);
+		doTick();
 
-				nodeEls.forEach(({ el, node }) => {
-					el.setAttribute('transform', `translate(${node.x ?? 0},${node.y ?? 0})`);
-				});
-			});
+		// Immediately notify panel with settled bounds (no async delay)
+		if (this.onLayoutEnd) {
+			const minX = Math.min(...simNodes.map(n => n.x - n.r));
+			const maxX = Math.max(...simNodes.map(n => n.x + n.r));
+			const minY = Math.min(...simNodes.map(n => n.y - n.r));
+			const maxY = Math.max(...simNodes.map(n => n.y + n.r + 23));
+			this.settledBounds = { minX, maxX, minY, maxY };
+			this.onLayoutEnd(this.settledBounds);
+		}
 
 		this.container.appendChild(svg);
 	}
 
-	private makeArrow(ns: string, id: string, reverseStart: boolean): SVGMarkerElement {
+	private makeArrow(ns: string, id: string, reverseStart: boolean, cls = 'cg-arrow'): SVGMarkerElement {
 		const marker = document.createElementNS(ns, 'marker');
 		marker.setAttribute('id', id);
 		marker.setAttribute('viewBox', '0 -5 10 10');
@@ -259,9 +316,17 @@ export class LocalGraphRenderer {
 		marker.setAttribute('orient', reverseStart ? 'auto-start-reverse' : 'auto');
 		const path = document.createElementNS(ns, 'path');
 		path.setAttribute('d', 'M0,-5L10,0L0,5');
-		path.setAttribute('class', 'cg-arrow');
+		path.setAttribute('class', cls);
 		marker.appendChild(path);
 		return marker;
+	}
+
+	centerContent(areaW: number, areaH: number): void {
+		if (!this.settledBounds || !this.applyTransformFn) return;
+		const { minX, maxX, minY, maxY } = this.settledBounds;
+		this.viewState.tx = areaW / 2 - (minX + maxX) / 2;
+		this.viewState.ty = areaH / 2 - (minY + maxY) / 2;
+		this.applyTransformFn();
 	}
 
 	updateLayout(chargeStrength: number, linkDistance: number): void {
@@ -277,6 +342,8 @@ export class LocalGraphRenderer {
 		this.simulation = null;
 		this.chargeForceFn = null;
 		this.linkForceFn = null;
+		this.applyTransformFn = null;
+		this.settledBounds = null;
 		this.svgEl?.remove();
 		this.svgEl = null;
 	}
