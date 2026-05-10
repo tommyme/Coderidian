@@ -40,5 +40,9 @@ export function readChromeCookies(): RawCookieRow[] {
         throw new CookieDbLockedError();
     }
 
-    return JSON.parse(output || '[]') as RawCookieRow[];
+    try {
+        return JSON.parse(output || '[]') as RawCookieRow[];
+    } catch {
+        throw new CookieDbLockedError();
+    }
 }
