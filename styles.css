@@ -855,3 +855,147 @@ If your plugin does not need CSS, delete this file.
   transform-box: fill-box;
   transform-origin: center;
 }
+
+/* ── Git Diff Modal ────────────────────────────────────────────────────────── */
+
+.coderidian-git-diff-modal {
+  width: 90vw;
+  max-width: 1200px;
+}
+
+.coderidian-git-diff-modal .modal-content {
+  display: flex;
+  flex-direction: column;
+  height: 75vh;
+  padding: 0;
+}
+
+.coderidian-git-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.coderidian-git-modal-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.coderidian-git-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--background-modifier-border);
+  padding: 8px 0;
+  font-size: 13px;
+}
+
+.coderidian-git-tree-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  margin: 1px 4px;
+  user-select: none;
+}
+
+.coderidian-git-tree-row:hover {
+  background: var(--background-secondary);
+}
+
+.coderidian-git-tree-delete {
+  opacity: 0;
+  padding: 0 4px;
+  line-height: 1;
+  font-size: 14px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.coderidian-git-tree-row:hover .coderidian-git-tree-delete {
+  opacity: 1;
+}
+
+.coderidian-git-tree-delete:hover {
+  background: var(--background-modifier-error);
+  color: var(--text-on-accent);
+}
+
+.coderidian-git-textarea {
+  flex: 1;
+  resize: none;
+  border: none;
+  outline: none;
+  padding: 12px;
+  font-family: var(--font-monospace);
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  overflow-y: auto;
+}
+
+/* ── Git Apply Modal ───────────────────────────────────────────────────────── */
+
+.coderidian-git-apply-modal .modal-content {
+  display: flex;
+  flex-direction: column;
+  height: 60vh;
+  padding: 0;
+}
+
+.coderidian-git-apply-area {
+  flex: 1;
+  resize: none;
+  border: none;
+  outline: none;
+  padding: 12px;
+  font-family: var(--font-monospace);
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.coderidian-git-apply-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--background-modifier-border);
+  flex-shrink: 0;
+}
+
+.coderidian-git-apply-results {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  font-size: 13px;
+}
+
+.coderidian-git-apply-result-row {
+  padding: 4px 0;
+  display: flex;
+  gap: 8px;
+}
+
+.coderidian-git-apply-result-row.error {
+  color: var(--text-error);
+}
+
+.coderidian-git-apply-result-errors {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding-left: 24px;
+}
