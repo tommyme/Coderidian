@@ -9,7 +9,7 @@ export class GitApplyModal extends Modal {
   constructor(app: App, folderPath: string) {
     super(app);
     this.folderPath = folderPath;
-    this.folderName = folderPath.split('/').pop() ?? folderPath || 'vault root';
+    this.folderName = (folderPath.split('/').pop() ?? folderPath) || 'vault root';
   }
 
   onOpen(): void {
