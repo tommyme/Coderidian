@@ -11,6 +11,7 @@ import { HeadingLevelModal } from './views/heading-level-modal';
 import { formatFolderDiff } from './services/git-diff/git-diff-formatter';
 import { GitDiffModal } from './services/git-diff/git-diff-modal';
 import { GitApplyModal } from './services/git-diff/git-apply-modal';
+import { importChromeCookies } from './services/chrome-cookie-sync';
 
 /**
  * Wrap selected content with HTML tags
@@ -589,6 +590,12 @@ export function registerCommands(plugin: MyPlugin) {
 			plugin.saveSettings();
 			new Notice(plugin.settings.fileHiderEnabled ? 'File hiding enabled' : 'File hiding disabled');
 		},
+	});
+
+	plugin.addCommand({
+		id: 'import-chrome-cookies',
+		name: '[Browser] Import Chrome Cookies',
+		callback: () => { importChromeCookies(); },
 	});
 }
 
