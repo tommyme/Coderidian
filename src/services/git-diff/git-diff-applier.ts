@@ -193,7 +193,7 @@ function applyHunk(
   const endIdx =
     endAnchor.length > 0
       ? findAnchor(fileLines, endAnchor, startIdx)
-      : startIdx + startAnchor.length - 1;
+      : startIdx + hunkLines.length;
   if (endIdx === -1) return { success: false, error: 'end anchor not found' };
 
   const endExclusive = endIdx + (endAnchor.length || 0);
