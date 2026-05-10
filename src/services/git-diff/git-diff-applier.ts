@@ -170,7 +170,13 @@ function applyHunk(
   fileContent: string,
   hunk: string,
 ): { success: true; content: string } | { success: false; error: string } {
-  const hunkLines = hunk.split('\n').filter(l => l !== '');
+  const rawLines = hunk.split('\n');
+  // Trim only leading and trailing empty lines (preserve internal blank lines)
+  let trimStart = 0;
+  let trimEnd = rawLines.length;
+  while (trimStart < trimEnd && rawLines[trimStart] === '') trimStart++;
+  while (trimEnd > trimStart && rawLines[trimEnd - 1] === '') trimEnd--;
+  const hunkLines = rawLines.slice(trimStart, trimEnd);
   if (hunkLines.length === 0) return { success: false, error: 'empty hunk' };
 
   const fileLines = fileContent.split('\n');
