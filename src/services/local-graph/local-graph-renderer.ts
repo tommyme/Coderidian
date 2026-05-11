@@ -40,6 +40,7 @@ export class LocalGraphRenderer {
 	private viewState = { scale: 1, tx: 0, ty: 0 };
 	private applyTransformFn: (() => void) | null = null;
 	private settledBounds: { minX: number; maxX: number; minY: number; maxY: number } | null = null;
+	private tooltipEl: HTMLDivElement | null = null;
 
 	constructor(
 		private container: HTMLElement,
@@ -302,6 +303,26 @@ export class LocalGraphRenderer {
 			this.onLayoutEnd(this.settledBounds);
 		}
 
+		// Tooltip element for full-path display on hover
+		const tooltip = document.createElement('div');
+		tooltip.className = 'cg-node-tooltip';
+		document.body.appendChild(tooltip);
+		this.tooltipEl = tooltip;
+
+		nodeEls.forEach(({ el, node }) => {
+			el.addEventListener('mouseenter', () => {
+				tooltip.textContent = node.id;
+				tooltip.style.display = 'block';
+			});
+			el.addEventListener('mousemove', (e: MouseEvent) => {
+				tooltip.style.left = `${e.clientX + 12}px`;
+				tooltip.style.top = `${e.clientY + 12}px`;
+			});
+			el.addEventListener('mouseleave', () => {
+				tooltip.style.display = 'none';
+			});
+		});
+
 		this.container.appendChild(svg);
 	}
 
@@ -346,5 +367,7 @@ export class LocalGraphRenderer {
 		this.settledBounds = null;
 		this.svgEl?.remove();
 		this.svgEl = null;
+		this.tooltipEl?.remove();
+		this.tooltipEl = null;
 	}
 }

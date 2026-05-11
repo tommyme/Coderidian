@@ -855,6 +855,20 @@ If your plugin does not need CSS, delete this file.
   transform-box: fill-box;
   transform-origin: center;
 }
+.cg-node-tooltip {
+  display: none;
+  position: fixed;
+  z-index: 10000;
+  pointer-events: none;
+  padding: 4px 8px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  max-width: 400px;
+  word-break: break-all;
+}
 
 /* ── Git Diff Modal ────────────────────────────────────────────────────────── */
 

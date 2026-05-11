@@ -35,7 +35,7 @@ export class LocalGraphService {
 			// Outgoing links
 			const cache = this.app.metadataCache.getFileCache(file);
 			for (const link of cache?.links ?? []) {
-				const dest = this.app.metadataCache.getFirstLinkpathDest(link.link, item.path);
+				const dest = this.app.metadataCache.getFirstLinkpathDest(link.link.split('#')[0], item.path);
 				if (!dest) continue;
 				this.recordEdge(edgeMap, item.path, dest.path);
 				if (!visited.has(dest.path)) {

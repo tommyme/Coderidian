@@ -92,7 +92,7 @@ export class LocalGraphPanel {
 				this.graphAreaEl,
 				data,
 				this.app,
-				(nodeId) => this.navigateTo(nodeId, file.path),
+				(nodeId) => this.navigateTo(nodeId),
 				charge,
 				distance,
 				(bounds) => this.autoFitPanel(bounds),
@@ -125,10 +125,10 @@ export class LocalGraphPanel {
 		this.renderer?.centerContent(panelW, panelH - CHROME_H);
 	}
 
-	private navigateTo(nodeId: string, sourcePath: string): void {
+	private navigateTo(nodeId: string): void {
 		const file = this.app.vault.getAbstractFileByPath(nodeId);
 		if (file instanceof TFile) {
-			this.app.workspace.openLinkText(file.basename, sourcePath, 'tab');
+			this.app.workspace.getLeaf('tab').openFile(file);
 		}
 	}
 
