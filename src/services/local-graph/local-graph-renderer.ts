@@ -46,7 +46,8 @@ export class LocalGraphRenderer {
 		private container: HTMLElement,
 		private data: GraphData,
 		private app: App,
-		private onClickNode?: (nodeId: string) => void,
+		private currentFilePath: string,
+		private onClickNode?: (nodeId: string, newTab: boolean) => void,
 		private chargeStrength: number = -220,
 		private linkDistance: number = 90,
 		private onLayoutEnd?: (bounds: { minX: number; maxX: number; minY: number; maxY: number }) => void,
@@ -106,17 +107,19 @@ export class LocalGraphRenderer {
 		g.appendChild(nodesG);
 
 		// Build edge elements — classify by relationship to current node
-		const getEdgeInfo = (edge: SimEdge) => {
+const getEdgeInfo = (edge: SimEdge) => {
+			const srcId = typeof edge.source === 'object' ? (edge.source as SimNode).id : edge.source as string;
+			const tgtId = typeof edge.target === 'object' ? (edge.target as SimNode).id : edge.target as string;
 			if (edge.type === 'bidirectional') return {
 				cls: 'cg-edge-bidir',
 				markerEnd: `url(#cg-arr-bi-e-${u})`,
 				markerStart: `url(#cg-arr-bi-s-${u})`,
 			};
-			if (edge.source.isCurrent) return {
+			if (srcId === this.currentFilePath) return {
 				cls: 'cg-edge-outlink',
 				markerEnd: `url(#cg-arr-out-${u})`,
 			};
-			if (edge.target.isCurrent) return {
+			if (tgtId === this.currentFilePath) return {
 				cls: 'cg-edge-inlink',
 				markerEnd: `url(#cg-arr-in-${u})`,
 			};
@@ -159,7 +162,7 @@ export class LocalGraphRenderer {
 			circle.addEventListener('click', (e) => {
 				if (hasDragged) { hasDragged = false; return; }
 				e.stopPropagation();
-				this.onClickNode?.(node.id);
+				this.onClickNode?.(node.id, e.metaKey);
 			});
 
 			return {

@@ -92,7 +92,8 @@ export class LocalGraphPanel {
 				this.graphAreaEl,
 				data,
 				this.app,
-				(nodeId) => this.navigateTo(nodeId),
+				file.path,
+				(nodeId, newTab) => this.navigateTo(nodeId, newTab),
 				charge,
 				distance,
 				(bounds) => this.autoFitPanel(bounds),
@@ -125,10 +126,10 @@ export class LocalGraphPanel {
 		this.renderer?.centerContent(panelW, panelH - CHROME_H);
 	}
 
-	private navigateTo(nodeId: string): void {
+	private navigateTo(nodeId: string, newTab = false): void {
 		const file = this.app.vault.getAbstractFileByPath(nodeId);
 		if (file instanceof TFile) {
-			this.app.workspace.getLeaf('tab').openFile(file);
+			this.app.workspace.getLeaf(newTab ? 'tab' : false).openFile(file);
 		}
 	}
 
@@ -155,25 +156,8 @@ export class LocalGraphPanel {
 		const titleBar = panel.createDiv({ cls: 'cg-panel-titlebar' });
 		titleBar.createSpan({ cls: 'cg-panel-title', text: 'Local Graph' });
 
-		const actions = titleBar.createDiv({ cls: 'cg-panel-actions' });
-
-		const pinBtn = actions.createEl('button', { cls: 'cg-pin-btn', text: '📌' });
-		pinBtn.setAttribute('aria-label', 'Pin window on top');
-		pinBtn.addEventListener('click', () => {
-			this.isPinned = !this.isPinned;
-			pinBtn.toggleClass('cg-pin-active', this.isPinned);
-			this.setAlwaysOnTop(this.isPinned);
-			if (this.isPinned) {
-				if (this.activeLeafRef) {
-					this.app.workspace.offref(this.activeLeafRef);
-					this.activeLeafRef = null;
-				}
-			} else {
-				this.registerFileWatch();
-			}
-		});
-
-		const closeBtn = actions.createEl('button', { cls: 'cg-close-btn', text: '✕' });
+		// ── Close button — fixed to panel top-right, outside titlebar ──────
+		const closeBtn = panel.createEl('button', { cls: 'cg-close-btn', text: '✕' });
 		closeBtn.setAttribute('aria-label', 'Close');
 		closeBtn.addEventListener('click', () => this.close());
 
@@ -183,7 +167,7 @@ export class LocalGraphPanel {
 		this.graphAreaEl = body.createDiv({ cls: 'cg-graph-area' });
 		this.setupPanelControls(body);
 
-		this.makeDraggable(panel, titleBar, pinBtn, closeBtn);
+		this.makeDraggable(panel, titleBar, closeBtn);
 
 		return panel;
 	}

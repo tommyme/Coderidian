@@ -127,9 +127,9 @@ If your plugin does not need CSS, delete this file.
   display: flex;
   flex-direction: column;
   background: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
+  border: 2px solid var(--background-modifier-border-hover);
   border-radius: 8px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  box-shadow: none;
   overflow: hidden;
 }
 
@@ -592,35 +592,44 @@ If your plugin does not need CSS, delete this file.
   height: 380px;
   top: 60px;
   right: 20px;
+  background: transparent;
 }
 .coderidian-graph-panel.cg-auto-resizing {
   transition: width 0.2s ease, height 0.2s ease;
 }
 
-/* Compact titlebar for graph panel */
+/* Titlebar overlays canvas — takes no flex space */
 .cg-panel-titlebar {
+  position: absolute;
+  top: 0;
+  left: 25%;
+  right: 25%;
+  z-index: 10;
   display: flex;
   align-items: center;
-  padding: 5px 8px;
-  background: var(--background-secondary);
-  border-bottom: 1px solid var(--background-modifier-border);
+  padding: 4px 6px;
+  background: transparent;
+  border-bottom: none;
   cursor: grab;
   user-select: none;
-  flex-shrink: 0;
 }
 .cg-panel-titlebar:active { cursor: grabbing; }
 .cg-panel-title {
-  flex: 1;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-normal);
+  display: none;
 }
 .cg-panel-actions {
   display: flex;
   gap: 2px;
+  margin-left: auto;
 }
-.cg-pin-btn,
+.cg-pin-btn {
+  display: none;
+}
 .cg-close-btn {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  z-index: 11;
   width: 22px;
   height: 22px;
   padding: 0;
@@ -635,13 +644,9 @@ If your plugin does not need CSS, delete this file.
   justify-content: center;
   transition: background 0.1s, color 0.1s;
 }
-.cg-pin-btn:hover,
 .cg-close-btn:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
-}
-.cg-pin-active {
-  color: var(--interactive-accent) !important;
 }
 
 /* Body of the floating panel: no overflow/padding, graph fills it */
@@ -702,29 +707,38 @@ If your plugin does not need CSS, delete this file.
   box-shadow: none;
 }
 
-/* Graph area fills canvas minus controls bar */
+/* Graph area fills the full body — controls overlay on top */
 .cg-graph-area {
   position: absolute;
-  inset: 0 0 36px 0;
+  inset: 0;
 }
 .coderidian-graph-panel-body .cg-graph-area {
-  inset: 0 0 36px 0;
+  inset: 0;
 }
 
-/* Controls bar — always visible at bottom */
+/* Controls bar — auto-hide, floating pill at bottom */
 .cg-controls {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 36px;
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
   padding: 0 10px;
   background: var(--background-secondary);
-  border-top: 1px solid var(--background-modifier-border);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+.coderidian-graph-panel-body:hover .cg-controls {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .cg-ctrl-group {
@@ -794,7 +808,6 @@ If your plugin does not need CSS, delete this file.
 .cg-edge-inlink {
   stroke: var(--text-muted);
   stroke-width: 1.2;
-  stroke-opacity: 0.5;
   stroke-dasharray: 5 3;
   fill: none;
 }
