@@ -19,6 +19,8 @@ import { SIMILAR_NOTES_VIEW_TYPE, SimilarNotesView } from './views/similar-notes
 import { TerminalService, TERMINAL_VIEW_TYPE } from './terminal';
 import { FileHiderService } from './services/file-hider/file-hider-service';
 import { LocalGraphService, LocalGraphPanel } from './services/local-graph';
+import { CliRunner } from './services/cli';
+import { LarkCliClient, LarkDoc } from './services/lark';
 
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
@@ -363,6 +365,18 @@ export default class MyPlugin extends Plugin {
 	 */
 	public sendTextToTerminal(text: string, newline = false): boolean {
 		return this.terminalService?.sendText(text, newline) ?? false;
+	}
+
+	/**
+	 * 公开 API：获取飞书文档列表
+	 * 调用固定的 lark-cli 命令并返回结构化文档数据。
+	 *
+	 * 用法（其他插件）：
+	 *   const docs = await app.plugins.plugins.coderidian.fetchLarkDocs();
+	 */
+	public async fetchLarkDocs(): Promise<LarkDoc[]> {
+		const client = new LarkCliClient(new CliRunner());
+		return client.fetchDocs();
 	}
 
 	async findSimilarNotes(filePath: string, limit = 10): Promise<import('./services/note-similarity/types').SimilarNote[]> {
