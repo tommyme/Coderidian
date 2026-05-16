@@ -3,6 +3,11 @@ import { CliRunner } from '../cli/runner';
 import { LarkDoc } from './types';
 
 const LARK_COMMAND = 'lark-cli drive +search --mine --doc-types docx';
+const DOC_TIMEOUT_MS = 60_000;
+
+function shellQuote(s: string): string {
+	return `'${s.replace(/'/g, "'\\''")}'`;
+}
 
 export class LarkCliClient {
 	constructor(private runner: CliRunner) {}
@@ -11,6 +16,79 @@ export class LarkCliClient {
 		const stdout = await this.runner.run(LARK_COMMAND);
 		const raw = JSON.parse(stdout);
 		return LarkCliClient.normalize(raw);
+	}
+
+	async createDoc(title: string, content: string, vaultPath: string, wikiSpace?: string): Promise<string> {
+		const { writeFileSync, unlinkSync } = require('fs') as typeof import('fs');
+		const { join } = require('path') as typeof import('path');
+
+		const relName = `.coderidian-lark-tmp-${Date.now()}.md`;
+		writeFileSync(join(vaultPath, relName), content, 'utf8');
+
+		try {
+			let cmd = `lark-cli docs +create --title ${shellQuote(title)} --markdown @${relName}`;
+			if (wikiSpace) cmd += ` --wiki-space ${shellQuote(wikiSpace)}`;
+			cmd += ' 2>/dev/null';
+			const stdout = await this.runner.run(cmd, DOC_TIMEOUT_MS, vaultPath);
+			return LarkCliClient.parseCreateOutput(stdout);
+		} finally {
+			try { unlinkSync(join(vaultPath, relName)); } catch {}
+		}
+	}
+
+	async updateDoc(docRef: string, newTitle: string, content: string, vaultPath: string): Promise<void> {
+		const { writeFileSync, unlinkSync } = require('fs') as typeof import('fs');
+		const { join } = require('path') as typeof import('path');
+
+		const relName = `.coderidian-lark-tmp-${Date.now()}.md`;
+		writeFileSync(join(vaultPath, relName), content, 'utf8');
+
+		try {
+			const cmd = [
+				'lark-cli docs +update',
+				`--doc ${shellQuote(docRef)}`,
+				'--mode overwrite',
+				`--markdown @${relName}`,
+				`--new-title ${shellQuote(newTitle)}`,
+				'2>/dev/null',
+			].join(' ');
+			await this.runner.run(cmd, DOC_TIMEOUT_MS, vaultPath);
+		} finally {
+			try { unlinkSync(join(vaultPath, relName)); } catch {}
+		}
+	}
+
+	async checkDocExists(docUrl: string, vaultPath: string): Promise<boolean> {
+		const token = /\/wiki\/([A-Za-z0-9]+)/.exec(docUrl)?.[1];
+		if (!token) return true; // 非 wiki URL，无法判断，按存在处理
+		const data = JSON.stringify({ request_docs: [{ doc_token: token, doc_type: 'wiki' }] });
+		const stdout = await this.runner.run(
+			`lark-cli api POST /open-apis/drive/v1/metas/batch_query --data ${shellQuote(data)} 2>/dev/null`,
+			10_000,
+			vaultPath,
+		);
+		try {
+			const json = JSON.parse(stdout.trim());
+			return Array.isArray(json?.data?.metas) && json.data.metas.length > 0;
+		} catch {
+			return true; // 解析失败，保守按存在处理
+		}
+	}
+
+	private static parseCreateOutput(stdout: string): string {
+		stdout = stdout.trim();
+		try {
+			const json = JSON.parse(stdout);
+			const url = json?.url ?? json?.data?.doc_url ?? json?.data?.url ?? json?.data?.node?.url;
+			if (url) return url;
+			const token =
+				json?.token ??
+				json?.data?.token ??
+				json?.data?.node?.obj_token ??
+				json?.data?.node?.node_token;
+			if (token) return token;
+		} catch {}
+		return stdout;
 	}
 
 	// Accepts:

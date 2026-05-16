@@ -12,6 +12,8 @@ import { formatFolderDiff } from './services/git-diff/git-diff-formatter';
 import { GitDiffModal } from './services/git-diff/git-diff-modal';
 import { GitApplyModal } from './services/git-diff/git-apply-modal';
 import { importChromeCookies } from './services/chrome-cookie-sync';
+import { LarkCliClient } from './services/lark';
+import { CliRunner } from './services/cli';
 
 /**
  * Wrap selected content with HTML tags
@@ -596,6 +598,64 @@ export function registerCommands(plugin: MyPlugin) {
 		id: 'import-chrome-cookies',
 		name: '[Browser] Import Chrome Cookies',
 		callback: () => { importChromeCookies(plugin.app); },
+	});
+
+	plugin.addCommand({
+		id: 'lark-sync-doc',
+		name: '[Lark] Sync Note to Lark Doc',
+		editorCallback: async (editor) => {
+			const file = plugin.app.workspace.getActiveFile();
+			if (!file) { new Notice('No active file'); return; }
+
+			const fm = plugin.app.metadataCache.getFileCache(file)?.frontmatter;
+			const docUrl = fm?.['lark-doc'] as string | undefined;
+			const title = (fm?.['lark-title'] as string | undefined) || file.basename;
+			const content = getEditorValueWithoutFrontmatter(editor);
+			const vaultPath = (plugin.app.vault.adapter as any).basePath as string;
+			const client = new LarkCliClient(new CliRunner());
+
+			const doCreate = async (label = '创建飞书文档中…') => {
+				const notice = new Notice(label, 0);
+				try {
+					const url = await client.createDoc(title, content, vaultPath, 'my_library');
+					notice.hide();
+					await plugin.app.fileManager.processFrontMatter(file, (frontmatter) => {
+						frontmatter['lark-doc'] = url;
+						if (!frontmatter['lark-title']) frontmatter['lark-title'] = file.basename;
+					});
+					new Notice('✅ 飞书文档已创建', 5000);
+				} catch (e) {
+					notice.hide();
+					new Notice(`❌ 创建失败: ${e instanceof Error ? e.message : String(e)}`);
+				}
+			};
+
+			if (docUrl) {
+				let exists: boolean;
+				try {
+					exists = await client.checkDocExists(docUrl, vaultPath);
+				} catch (e) {
+					new Notice(`❌ 检查文档失败: ${e instanceof Error ? e.message : String(e)}`);
+					return;
+				}
+
+				if (exists) {
+					const notice = new Notice('同步飞书文档中…', 0);
+					try {
+						await client.updateDoc(docUrl, title, content, vaultPath);
+						notice.hide();
+						new Notice('✅ 飞书文档已同步', 3000);
+					} catch (e) {
+						notice.hide();
+						new Notice(`❌ 同步失败: ${e instanceof Error ? e.message : String(e)}`);
+					}
+				} else {
+					await doCreate('文档已删除，重新创建中…');
+				}
+			} else {
+				await doCreate();
+			}
+		},
 	});
 }
 

@@ -20,12 +20,14 @@ export class CliRunner {
 		this.env = { ...process.env, PATH };
 	}
 
-	run(command: string, timeoutMs = 30_000): Promise<string> {
+	run(command: string, timeoutMs = 30_000, cwd?: string): Promise<string> {
 		const { exec } = require('child_process');
 		return new Promise((resolve, reject) => {
+			const options: Record<string, unknown> = { encoding: 'utf8', timeout: timeoutMs, env: this.env };
+			if (cwd) options.cwd = cwd;
 			exec(
 				command,
-				{ encoding: 'utf8', timeout: timeoutMs, env: this.env },
+				options,
 				(err: any, stdout: string, stderr: string) => {
 					if (err) reject(new Error(stderr?.trim() || err.message));
 					else resolve(stdout);
