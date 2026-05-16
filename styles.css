@@ -123,7 +123,7 @@ If your plugin does not need CSS, delete this file.
   right: 40px;
   width: 30vw;
   height: 30vh;
-  z-index: 2;
+  z-index: 15;
   display: flex;
   flex-direction: column;
   background: var(--background-primary);
@@ -597,6 +597,12 @@ If your plugin does not need CSS, delete this file.
 .coderidian-graph-panel.cg-auto-resizing {
   transition: width 0.2s ease, height 0.2s ease;
 }
+.coderidian-graph-opaque .coderidian-graph-panel {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
 
 /* Titlebar overlays canvas — takes no flex space */
 .cg-panel-titlebar {
@@ -781,6 +787,14 @@ If your plugin does not need CSS, delete this file.
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
+.cg-ctrl-btn.cg-ctrl-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.cg-ctrl-btn.cg-ctrl-active:hover {
+  background: var(--interactive-accent-hover);
+  color: var(--text-on-accent);
+}
 
 .cg-ctrl-val {
   font-size: 12px;
@@ -852,6 +866,24 @@ If your plugin does not need CSS, delete this file.
   stroke: var(--interactive-accent);
 }
 
+.cg-node-external {
+  fill: #4a9eff;
+  stroke: rgba(74, 158, 255, 0.3);
+  stroke-width: 4px;
+}
+.cg-node:hover .cg-node-external {
+  filter: brightness(1.15);
+}
+
+.cg-node-unresolved {
+  fill: #ef4444;
+  stroke: rgba(239, 68, 68, 0.3);
+  stroke-width: 4px;
+}
+.cg-node:hover .cg-node-unresolved {
+  filter: brightness(1.15);
+}
+
 .cg-label {
   font-size: 11px;
   fill: var(--text-muted);
@@ -871,7 +903,7 @@ If your plugin does not need CSS, delete this file.
 .cg-node-tooltip {
   display: none;
   position: fixed;
-  z-index: 2;
+  z-index: 15;
   pointer-events: none;
   padding: 4px 8px;
   background: var(--background-secondary);

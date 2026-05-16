@@ -93,12 +93,30 @@ export class LocalGraphPanel {
 				data,
 				this.app,
 				file.path,
-				(nodeId, newTab) => this.navigateTo(nodeId, newTab),
+				(nodeId, newTab) => {
+					if (nodeId === file.path) {
+						// 点击当前文档节点 → 刷新整张图
+						this.renderGraph(file).catch(() => {});
+					} else {
+						this.navigateTo(nodeId, newTab);
+					}
+				},
 				charge,
 				distance,
 				(bounds) => this.autoFitPanel(bounds),
 			);
 			this.renderer.render();
+
+			// Async: fetch Feishu titles without blocking render
+			const externalUrls = data.nodes.filter(n => n.isExternal && n.url).map(n => n.url!);
+			if (externalUrls.length > 0) {
+				const renderer = this.renderer;
+				this.service.resolveFeishuTitles(externalUrls).then(updates => {
+					if (updates.size > 0 && this.renderer === renderer) {
+						renderer.updateNodeLabels(updates);
+					}
+				});
+			}
 		} catch (err) {
 			loading.textContent = `加载失败: ${err}`;
 		}
@@ -127,6 +145,10 @@ export class LocalGraphPanel {
 	}
 
 	private navigateTo(nodeId: string, newTab = false): void {
+		if (/^https?:\/\//.test(nodeId)) {
+			window.open(nodeId, '_blank');
+			return;
+		}
 		const file = this.app.vault.getAbstractFileByPath(nodeId);
 		if (file instanceof TFile) {
 			this.app.workspace.getLeaf(newTab ? 'tab' : false).openFile(file);
@@ -213,6 +235,20 @@ export class LocalGraphPanel {
 			this.sparsity = v;
 			const { charge, distance } = sparsityToForce(this.sparsity);
 			this.renderer?.updateLayout(charge, distance);
+		});
+
+		controls.createDiv({ cls: 'cg-ctrl-sep' });
+
+		const opaqueBtn = controls.createEl('button', {
+			cls: 'cg-ctrl-btn',
+			attr: { 'aria-label': '切换背景不透明' },
+		});
+		opaqueBtn.textContent = '◑';
+		opaqueBtn.toggleClass('cg-ctrl-active', document.body.classList.contains('coderidian-graph-opaque'));
+		opaqueBtn.addEventListener('click', (e) => {
+			e.stopPropagation();
+			document.body.classList.toggle('coderidian-graph-opaque');
+			opaqueBtn.toggleClass('cg-ctrl-active', document.body.classList.contains('coderidian-graph-opaque'));
 		});
 	}
 

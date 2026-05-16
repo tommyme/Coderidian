@@ -41,6 +41,7 @@ export class LocalGraphRenderer {
 	private applyTransformFn: (() => void) | null = null;
 	private settledBounds: { minX: number; maxX: number; minY: number; maxY: number } | null = null;
 	private tooltipEl: HTMLDivElement | null = null;
+	private labelEls = new Map<string, SVGTextElement>();
 
 	constructor(
 		private container: HTMLElement,
@@ -146,15 +147,19 @@ const getEdgeInfo = (edge: SimEdge) => {
 
 			const circle = document.createElementNS(ns, 'circle');
 			circle.setAttribute('r', String(node.r));
-			circle.setAttribute('class', node.isCurrent ? 'cg-node-current' : 'cg-node-other');
+			circle.setAttribute('class',
+				node.isCurrent    ? 'cg-node-current'    :
+				node.isExternal   ? 'cg-node-external'   :
+				node.isUnresolved ? 'cg-node-unresolved' : 'cg-node-other');
 			nodeG.appendChild(circle);
 
-			const label = document.createElementNS(ns, 'text');
+			const label = document.createElementNS(ns, 'text') as SVGTextElement;
 			label.setAttribute('class', 'cg-label');
 			label.setAttribute('dy', String(node.r + 12));
 			label.setAttribute('text-anchor', 'middle');
 			label.textContent = node.label;
 			nodeG.appendChild(label);
+			this.labelEls.set(node.id, label);
 
 			nodesG.appendChild(nodeG);
 
@@ -314,7 +319,7 @@ const getEdgeInfo = (edge: SimEdge) => {
 
 		nodeEls.forEach(({ el, node }) => {
 			el.addEventListener('mouseenter', () => {
-				tooltip.textContent = node.id;
+				tooltip.textContent = node.url ?? node.id;
 				tooltip.style.display = 'block';
 			});
 			el.addEventListener('mousemove', (e: MouseEvent) => {
@@ -345,6 +350,13 @@ const getEdgeInfo = (edge: SimEdge) => {
 		return marker;
 	}
 
+	updateNodeLabels(updates: Map<string, string>): void {
+		for (const [nodeId, newLabel] of updates) {
+			const el = this.labelEls.get(nodeId);
+			if (el) el.textContent = newLabel;
+		}
+	}
+
 	centerContent(areaW: number, areaH: number): void {
 		if (!this.settledBounds || !this.applyTransformFn) return;
 		const { minX, maxX, minY, maxY } = this.settledBounds;
@@ -372,5 +384,6 @@ const getEdgeInfo = (edge: SimEdge) => {
 		this.svgEl = null;
 		this.tooltipEl?.remove();
 		this.tooltipEl = null;
+		this.labelEls.clear();
 	}
 }

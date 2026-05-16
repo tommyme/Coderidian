@@ -33,11 +33,13 @@ export default class MyPlugin extends Plugin {
 	selectionMark: EditorPosition | null = null;
 	localGraphService: LocalGraphService;
 	private localGraphPanel: LocalGraphPanel | null = null;
+	private larkClient: LarkCliClient;
 
 	async onload() {
 		await this.loadSettings();
 		this.vscodeService = new VSCodeService(this.app, this.settings);
-		this.localGraphService = new LocalGraphService(this.app);
+		this.larkClient = new LarkCliClient(new CliRunner());
+		this.localGraphService = new LocalGraphService(this.app, this.larkClient);
 		this.registerExtensions(['ai'], 'markdown');
 
 		// 初始化全局 LLM API 管理器
@@ -375,8 +377,7 @@ export default class MyPlugin extends Plugin {
 	 *   const docs = await app.plugins.plugins.coderidian.fetchLarkDocs();
 	 */
 	public async fetchLarkDocs(): Promise<LarkDoc[]> {
-		const client = new LarkCliClient(new CliRunner());
-		return client.fetchDocs();
+		return this.larkClient.fetchDocs();
 	}
 
 	async findSimilarNotes(filePath: string, limit = 10): Promise<import('./services/note-similarity/types').SimilarNote[]> {

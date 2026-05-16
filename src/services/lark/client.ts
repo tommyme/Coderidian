@@ -75,6 +75,37 @@ export class LarkCliClient {
 		}
 	}
 
+	async fetchDocTitles(urls: string[], vaultPath: string): Promise<Map<string, string>> {
+		const entries = urls
+			.map(url => ({ url, token: /\/wiki\/([A-Za-z0-9]+)/.exec(url)?.[1] }))
+			.filter((e): e is { url: string; token: string } => !!e.token);
+
+		const result = new Map<string, string>();
+		if (entries.length === 0) return result;
+
+		const data = JSON.stringify({
+			request_docs: entries.map(e => ({ doc_token: e.token, doc_type: 'wiki' })),
+		});
+
+		try {
+			const stdout = await this.runner.run(
+				`lark-cli api POST /open-apis/drive/v1/metas/batch_query --data ${shellQuote(data)} 2>/dev/null`,
+				10_000,
+				vaultPath,
+			);
+			const json = JSON.parse(stdout.trim());
+			for (const meta of json?.data?.metas ?? []) {
+				// doc_token in response is the resolved docx token, not the original wiki token.
+				// The original request token is preserved in request_doc_info.doc_token.
+				const requestToken = meta.request_doc_info?.doc_token ?? meta.doc_token;
+				const entry = entries.find(e => e.token === requestToken);
+				if (entry && meta.title) result.set(entry.url, meta.title);
+			}
+		} catch {}
+
+		return result;
+	}
+
 	private static parseCreateOutput(stdout: string): string {
 		stdout = stdout.trim();
 		try {

@@ -6,6 +6,9 @@ export interface GraphNode extends SimulationNodeDatum {
 	lineCount: number;
 	isCurrent: boolean;
 	r?: number;
+	isExternal?: boolean;
+	url?: string;
+	isUnresolved?: boolean;
 }
 
 export interface GraphEdge extends SimulationLinkDatum<GraphNode> {
