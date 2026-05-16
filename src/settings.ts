@@ -31,6 +31,8 @@ export interface MyPluginSettings {
 	// File Hider settings
 	fileHiderEnabled: boolean;
 	fileHiderPatterns: string[];
+	// Mermaid settings
+	mermaidImgEnabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: MyPluginSettings = {
@@ -58,6 +60,8 @@ export const DEFAULT_SETTINGS: MyPluginSettings = {
 	// File Hider default settings
 	fileHiderEnabled: false,
 	fileHiderPatterns: [],
+	// Mermaid default settings
+	mermaidImgEnabled: true,
 };
 
 export class SampleSettingTab extends PluginSettingTab {
@@ -246,6 +250,7 @@ export class SampleSettingTab extends PluginSettingTab {
 
 		this.renderTerminalSettings(containerEl);
 		this.renderFileHiderSettings(containerEl);
+		this.renderMermaidSettings(containerEl);
 	}
 
 	private renderTerminalSettings(containerEl: HTMLElement): void {
@@ -384,6 +389,22 @@ export class SampleSettingTab extends PluginSettingTab {
 				ta.inputEl.style.width = '100%';
 				ta.inputEl.style.fontFamily = 'var(--font-monospace)';
 			});
+	}
+
+	private renderMermaidSettings(containerEl: HTMLElement): void {
+		containerEl.createEl('h2', { text: 'Mermaid Settings' });
+
+		new Setting(containerEl)
+			.setName('Render Mermaid as image')
+			.setDesc('Convert Mermaid diagrams to SVG images, compatible with image viewer plugins. Disable to use Obsidian\'s default rendering.')
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.mermaidImgEnabled)
+					.onChange(async (value) => {
+						this.plugin.settings.mermaidImgEnabled = value;
+						await this.plugin.saveSettings();
+					}),
+			);
 	}
 
 	private openEmbeddingConfigModal(): void {

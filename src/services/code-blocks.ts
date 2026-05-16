@@ -189,4 +189,64 @@ export function registerCodeBlockProcessors(plugin: Plugin) {
 		btn.addEventListener("click", () => eval(content));
 		el.appendChild(btn);
 	});
+
+	// Mermaid SVG → img
+	const processedSvgs = new WeakSet<SVGSVGElement>();
+
+	function tryConvert(svg: SVGSVGElement) {
+		if (!p.settings.mermaidImgEnabled) return;
+		if (processedSvgs.has(svg)) return;
+		processedSvgs.add(svg);
+		requestAnimationFrame(() => {
+			if (!svg.isConnected) return;
+			try {
+				const svgStr = new XMLSerializer().serializeToString(svg);
+				const b64 = btoa(unescape(encodeURIComponent(svgStr)));
+				const img = document.createElement('img');
+				img.className = 'coderidian-mermaid-img';
+				img.src = `data:image/svg+xml;base64,${b64}`;
+				img.alt = 'Mermaid diagram';
+				svg.style.display = 'none';
+				svg.insertAdjacentElement('afterend', img);
+			} catch (e) {
+				console.error('[coderidian] mermaid→img failed', e);
+			}
+		});
+	}
+
+	// Mirror mermaid-zoom: both selectors needed — .mermaid svg catches SVGs
+	// regardless of id format; svg[id^="mermaid-"] catches direct insertions.
+	function scanNode(node: Element) {
+		if (node instanceof HTMLElement && node.classList.contains('mermaid')) {
+			const svg = node.querySelector('svg');
+			if (svg) tryConvert(svg as SVGSVGElement);
+		}
+		for (const svg of node.querySelectorAll<SVGSVGElement>('.mermaid svg, svg[id^="mermaid-"]')) {
+			tryConvert(svg);
+		}
+	}
+
+	function scanAll() {
+		for (const svg of document.querySelectorAll<SVGSVGElement>('.mermaid svg, svg[id^="mermaid-"]')) {
+			tryConvert(svg);
+		}
+	}
+
+	const mutationObserver = new MutationObserver((mutations) => {
+		for (const { addedNodes } of mutations) {
+			for (const node of addedNodes) {
+				if (node instanceof HTMLElement || node instanceof SVGElement) {
+					scanNode(node as Element);
+				}
+			}
+		}
+	});
+	mutationObserver.observe(document.body, { childList: true, subtree: true });
+
+	plugin.app.workspace.onLayoutReady(scanAll);
+	plugin.registerEvent(plugin.app.workspace.on('layout-change', scanAll));
+	plugin.registerEvent(plugin.app.workspace.on('active-leaf-change', scanAll));
+	plugin.registerEvent(plugin.app.workspace.on('file-open', () => setTimeout(scanAll, 200)));
+	plugin.register(() => mutationObserver.disconnect());
 }
+
