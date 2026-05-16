@@ -595,7 +595,7 @@ export function registerCommands(plugin: MyPlugin) {
 	plugin.addCommand({
 		id: 'import-chrome-cookies',
 		name: '[Browser] Import Chrome Cookies',
-		callback: () => { importChromeCookies(); },
+		callback: () => { importChromeCookies(plugin.app); },
 	});
 }
 
