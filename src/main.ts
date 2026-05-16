@@ -20,7 +20,7 @@ import { TerminalService, TERMINAL_VIEW_TYPE } from './terminal';
 import { FileHiderService } from './services/file-hider/file-hider-service';
 import { LocalGraphService, LocalGraphPanel } from './services/local-graph';
 import { CliRunner } from './services/cli';
-import { LarkCliClient, LarkDoc } from './services/lark';
+import { LarkCliClient, LarkDoc, readLarkCache, writeLarkCache, isLarkCacheFresh } from './services/lark';
 
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
@@ -377,7 +377,17 @@ export default class MyPlugin extends Plugin {
 	 *   const docs = await app.plugins.plugins.coderidian.fetchLarkDocs();
 	 */
 	public async fetchLarkDocs(): Promise<LarkDoc[]> {
-		return this.larkClient.fetchDocs();
+		const cached = await readLarkCache();
+		if (cached && isLarkCacheFresh(cached)) return cached.docs;
+		const docs = await this.larkClient.fetchDocs();
+		await writeLarkCache({ timestamp: Date.now(), docs });
+		return docs;
+	}
+
+	public async refreshLarkDocs(): Promise<LarkDoc[]> {
+		const docs = await this.larkClient.fetchDocs();
+		await writeLarkCache({ timestamp: Date.now(), docs });
+		return docs;
 	}
 
 	async findSimilarNotes(filePath: string, limit = 10): Promise<import('./services/note-similarity/types').SimilarNote[]> {

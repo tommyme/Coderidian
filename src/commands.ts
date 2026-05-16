@@ -657,6 +657,22 @@ export function registerCommands(plugin: MyPlugin) {
 			}
 		},
 	});
+
+	plugin.addCommand({
+		id: 'refresh-lark-docs',
+		name: 'Refresh Feishu Documents',
+		callback: async () => {
+			const notice = new Notice('正在刷新飞书文档列表...', 0);
+			try {
+				const docs = await plugin.refreshLarkDocs();
+				notice.hide();
+				new Notice(`飞书文档已更新，共 ${docs.length} 篇`);
+			} catch (e) {
+				notice.hide();
+				new Notice(`刷新失败：${(e as Error).message}`);
+			}
+		},
+	});
 }
 
 // ── Editor command helpers ────────────────────────────────────────────────────
