@@ -659,8 +659,8 @@ export function registerCommands(plugin: MyPlugin) {
 	});
 
 	plugin.addCommand({
-		id: 'refresh-lark-docs',
-		name: 'Refresh Feishu Documents',
+		id: 'lark-refresh-docs',
+		name: '[Lark] Refresh Lark Documents',
 		callback: async () => {
 			const notice = new Notice('正在刷新飞书文档列表...', 0);
 			try {
