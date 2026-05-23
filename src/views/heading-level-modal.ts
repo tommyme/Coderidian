@@ -1,4 +1,5 @@
 import { App, Editor, Modal, Notice } from 'obsidian';
+import { syntaxTree } from '@codemirror/language';
 
 export class HeadingLevelModal extends Modal {
 	private delta = 0;
@@ -59,11 +60,32 @@ export class HeadingLevelModal extends Modal {
 			? editor.getCursor('to').line
 			: editor.getCursor().line;
 
+		const cmState: any = (editor as any).cm?.state;
+		const tree = cmState ? syntaxTree(cmState) : null;
+
 		const headingLines: { n: number; currentLevel: number; line: string }[] = [];
 		for (let n = startLine; n <= endLine; n++) {
 			const line = editor.getLine(n);
 			const match = line.match(/^(#{1,6})(\s|$)/);
 			if (!match) continue;
+
+			if (tree && cmState) {
+				try {
+					// CM doc lines are 1-indexed; editor lines are 0-indexed
+					const cmLine = cmState.doc.line(n + 1);
+					let cur: any = tree.resolveInner(cmLine.from, 1);
+					let isHeading = false;
+					while (cur) {
+						// Obsidian uses HyperMD parser: heading nodes are named "HyperMD-header_..."
+						if (cur.name.includes('header')) { isHeading = true; break; }
+						cur = cur.parent;
+					}
+					if (!isHeading) continue;
+				} catch {
+					// fall through: treat as heading (safe degradation)
+				}
+			}
+
 			headingLines.push({ n, currentLevel: match[1].length, line });
 		}
 
@@ -81,10 +103,13 @@ export class HeadingLevelModal extends Modal {
 			}
 		}
 
-		for (const { n, currentLevel, line } of headingLines) {
-			const newLevel = currentLevel + this.delta;
-			editor.setLine(n, '#'.repeat(newLevel) + line.slice(currentLevel));
-		}
+		editor.transaction({
+			changes: headingLines.map(({ n, currentLevel, line }) => ({
+				from: { line: n, ch: 0 },
+				to:   { line: n, ch: line.length },
+				text: '#'.repeat(currentLevel + this.delta) + line.slice(currentLevel),
+			})),
+		});
 		return true;
 	}
 
