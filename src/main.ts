@@ -21,6 +21,7 @@ import { FileHiderService } from './services/file-hider/file-hider-service';
 import { LocalGraphService, LocalGraphPanel } from './services/local-graph';
 import { CliRunner } from './services/cli';
 import { LarkCliClient, LarkDoc, readLarkCache, writeLarkCache, isLarkCacheFresh } from './services/lark';
+import { smoothSelectionExtension } from './services/smooth-selection/smooth-selection-extension';
 
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
@@ -41,6 +42,7 @@ export default class MyPlugin extends Plugin {
 		this.larkClient = new LarkCliClient(new CliRunner());
 		this.localGraphService = new LocalGraphService(this.app, this.larkClient);
 		this.registerExtensions(['ai'], 'markdown');
+		this.registerEditorExtension(smoothSelectionExtension());
 
 		// 初始化全局 LLM API 管理器
 		const activeConfig = this.getActiveApiConfig();
