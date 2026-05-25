@@ -18,44 +18,53 @@ export class LarkCliClient {
 		return LarkCliClient.normalize(raw);
 	}
 
-	async createDoc(title: string, content: string, vaultPath: string, wikiSpace?: string): Promise<string> {
-		const { writeFileSync, unlinkSync } = require('fs') as typeof import('fs');
-		const { join } = require('path') as typeof import('path');
-
-		const relName = `.coderidian-lark-tmp-${Date.now()}.md`;
-		writeFileSync(join(vaultPath, relName), content, 'utf8');
-
-		try {
-			let cmd = `lark-cli docs +create --title ${shellQuote(title)} --markdown @${relName}`;
-			if (wikiSpace) cmd += ` --wiki-space ${shellQuote(wikiSpace)}`;
-			cmd += ' 2>/dev/null';
-			const stdout = await this.runner.run(cmd, DOC_TIMEOUT_MS, vaultPath);
-			return LarkCliClient.parseCreateOutput(stdout);
-		} finally {
-			try { unlinkSync(join(vaultPath, relName)); } catch {}
-		}
+	async createDoc(title: string, vaultPath: string, wikiSpace?: string): Promise<string> {
+		let cmd = `lark-cli docs +create --title ${shellQuote(title)} --markdown ${shellQuote('.')}`;
+		if (wikiSpace) cmd += ` --wiki-space ${shellQuote(wikiSpace)}`;
+		cmd += ' 2>/dev/null';
+		const stdout = await this.runner.run(cmd, DOC_TIMEOUT_MS, vaultPath);
+		return LarkCliClient.parseCreateOutput(stdout);
 	}
 
-	async updateDoc(docRef: string, newTitle: string, content: string, vaultPath: string): Promise<void> {
-		const { writeFileSync, unlinkSync } = require('fs') as typeof import('fs');
-		const { join } = require('path') as typeof import('path');
+	// 3-step: upload XML (v2) → set title (v1, clears body) → re-upload XML (v2)
+	async updateDoc(docUrl: string, newTitle: string, xmlContent: string, vaultPath: string): Promise<void> {
+		await this.uploadXml(docUrl, xmlContent, vaultPath);
+		await this.runner.run(
+			`lark-cli docs +update --doc ${shellQuote(docUrl)} --mode overwrite --markdown ${shellQuote('.')} --new-title ${shellQuote(newTitle)} 2>/dev/null`,
+			DOC_TIMEOUT_MS,
+			vaultPath,
+		);
+		await this.uploadXml(docUrl, xmlContent, vaultPath);
+	}
 
-		const relName = `.coderidian-lark-tmp-${Date.now()}.md`;
-		writeFileSync(join(vaultPath, relName), content, 'utf8');
+	private async uploadXml(docUrl: string, xmlContent: string, vaultPath: string): Promise<void> {
+		const cmd = [
+			'NODE_OPTIONS=""',
+			'lark-cli docs +update',
+			'--api-version v2',
+			`--doc ${shellQuote(docUrl)}`,
+			'--command overwrite',
+			'--doc-format xml',
+			`--content ${shellQuote(xmlContent)}`,
+			'2>/dev/null',
+		].join(' ');
+		await this.runner.run(cmd, DOC_TIMEOUT_MS, vaultPath);
+	}
 
-		try {
-			const cmd = [
-				'lark-cli docs +update',
-				`--doc ${shellQuote(docRef)}`,
-				'--mode overwrite',
-				`--markdown @${relName}`,
-				`--new-title ${shellQuote(newTitle)}`,
-				'2>/dev/null',
-			].join(' ');
-			await this.runner.run(cmd, DOC_TIMEOUT_MS, vaultPath);
-		} finally {
-			try { unlinkSync(join(vaultPath, relName)); } catch {}
-		}
+	// relFilePath: relative to vaultPath; lark-cli +media-insert uses the doc URL directly
+	async insertMedia(docUrl: string, relFilePath: string, vaultPath: string): Promise<string> {
+		const cmd = [
+			'NODE_OPTIONS=""',
+			'lark-cli docs +media-insert',
+			`--doc ${shellQuote(docUrl)}`,
+			`--file ${shellQuote(relFilePath)}`,
+			'2>/dev/null',
+		].join(' ');
+		const stdout = await this.runner.run(cmd, 30_000, vaultPath);
+		const json = JSON.parse(stdout.trim());
+		const token = json?.data?.file_token;
+		if (!token) throw new Error(`media-insert returned no file_token: ${stdout.slice(0, 200)}`);
+		return token;
 	}
 
 	async checkDocExists(docUrl: string, vaultPath: string): Promise<boolean> {

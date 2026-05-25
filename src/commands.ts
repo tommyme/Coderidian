@@ -13,6 +13,7 @@ import { GitDiffModal } from './services/git-diff/git-diff-modal';
 import { GitApplyModal } from './services/git-diff/git-apply-modal';
 import { importChromeCookies } from './services/chrome-cookie-sync';
 import { LarkCliClient } from './services/lark';
+import { preprocessMarkdownForLark } from './services/lark/markdown-preprocessor';
 import { CliRunner } from './services/cli';
 
 /**
@@ -617,12 +618,22 @@ export function registerCommands(plugin: MyPlugin) {
 			const doCreate = async (label = '创建飞书文档中…') => {
 				const notice = new Notice(label, 0);
 				try {
-					const url = await client.createDoc(title, content, vaultPath, 'my_library');
-					notice.hide();
+					// Step 1: create doc to obtain URL (needed for media upload)
+					const url = await client.createDoc(title, vaultPath, 'my_library');
 					await plugin.app.fileManager.processFrontMatter(file, (frontmatter) => {
 						frontmatter['lark-doc'] = url;
 						if (!frontmatter['lark-title']) frontmatter['lark-title'] = file.basename;
 					});
+
+					// Step 2: preprocess markdown → XML, upload images, update doc
+					notice.noticeEl.setText('上传图片中…');
+					const xml = await preprocessMarkdownForLark(
+						content, url, plugin.app, vaultPath, client,
+						(msg) => notice.noticeEl.setText(msg),
+					);
+					await client.updateDoc(url, title, xml, vaultPath);
+
+					notice.hide();
 					new Notice('✅ 飞书文档已创建', 5000);
 				} catch (e) {
 					notice.hide();
@@ -642,7 +653,12 @@ export function registerCommands(plugin: MyPlugin) {
 				if (exists) {
 					const notice = new Notice('同步飞书文档中…', 0);
 					try {
-						await client.updateDoc(docUrl, title, content, vaultPath);
+						notice.noticeEl.setText('上传图片中…');
+						const xml = await preprocessMarkdownForLark(
+							content, docUrl, plugin.app, vaultPath, client,
+							(msg) => notice.noticeEl.setText(msg),
+						);
+						await client.updateDoc(docUrl, title, xml, vaultPath);
 						notice.hide();
 						new Notice('✅ 飞书文档已同步', 3000);
 					} catch (e) {
